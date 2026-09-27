@@ -25,7 +25,7 @@ function addLife(w,key,source="sun",parent=null){
 }
 export function createWorld(seed=2026){
  const w={tick:0,seed:seed>>>0,nextId:1,settings:{populationCap:120,seasonLength:40},sun:{level:1,energy:100,knowledge:0,health:100,policy:"balanced",memory:[],q:{},lastPolicy:null},environment:{season:0,temperature:22,light:.8,water:72,soil:70,nutrients:65,biomass:10,biodiversity:0,stability:60},entities:[],events:[],history:[],stats:{births:0,deaths:0,returns:0,extinctions:0}};
- ["tree","tree","flower","flower","herbivore","pollinator","fungus","aquatic"].forEach(k=>addLife(w,k,"initial"));w.sun.energy=75;return w;
+ ["tree","tree","flower","flower","herbivore","pollinator","predator","fungus","aquatic"].forEach(k=>addLife(w,k,"initial"));w.sun.energy=75;return w;
 }
 function evaluate(w){
  const l=alive(w),env=w.environment,plants=l.filter(e=>e.role==="producer").length,consumers=l.filter(e=>e.role==="consumer").length;
@@ -68,7 +68,7 @@ function lifecycle(w){
   else if(e.stage==="sprout"){e.growth=clamp(e.growth+.08,0,1);if(e.growth>=1)e.stage="juvenile"}
   else if(e.stage==="juvenile"&&e.age>=8)e.stage="adult";
   else if(e.stage==="adult"&&e.age>=e.life*.68)e.stage="aging";
-  if(e.stage==="aging"&&(e.age>=e.life||e.health<=0||e.energy<=0)){e.stage="return";e.health=0;w.stats.deaths++;w.stats.returns++;w.environment.nutrients=clamp(w.environment.nutrients+2,0,100);log(w,e.name+" شماره "+e.id+" به چرخه مواد بازگشت.")}
+  if(e.stage==="aging"&&(e.age>=e.life||e.health<=0||e.energy<=0)){e.stage="return";e.health=0;w.stats.deaths++;w.stats.returns++;w.sun.energy=clamp(w.sun.energy+Math.max(0,e.energy)*.25,0,100);w.environment.nutrients=clamp(w.environment.nutrients+2,0,100);log(w,e.name+" شماره "+e.id+"؛ بخشی از انرژی به خورشید و مواد به خاک بازگشت.")}
   if(e.energy<5)e.health-=.6;
  }
  w.entities=w.entities.filter(e=>e.stage!=="return"||e.age<e.life+8);
