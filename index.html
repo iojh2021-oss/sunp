@@ -6,39 +6,75 @@
 <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-<header><div><span class="eyebrow">SUNP · مدل نمادین</span><h1>شبیه‌ساز چرخه حیات</h1><p>هسته محاسباتی چرخه حیات · گونه‌ها · محیط · تصمیم‌گیری خورشید</p></div><div class="sunmark" aria-hidden="true">☀</div></header>
+<header>
+  <div><span class="eyebrow">SUNP · مدل نمادین</span><h1>شبیه‌ساز چرخه حیات</h1><p>هسته محاسباتی چرخه حیات · زودیاک · درخت حیات · خورشید تطبیقی</p></div>
+  <div class="sunmark" aria-hidden="true">☀<span id="sunLevel" class="sun-level">۱</span></div>
+</header>
 <main>
-<section class="toolbar panel">
-<button id="toggle">▶ شروع</button><button id="step">گام بعدی</button><button id="reset" class="secondary">بازنشانی</button>
-<label>سرعت <input id="speed" type="range" min="1" max="5" value="1"><output id="speedVal">۱×</output></label>
+  <section class="toolbar panel">
+    <button id="toggle">▶ شروع</button><button id="step">گام بعدی</button><button id="reset" class="secondary">بازنشانی</button>
+    <label>سرعت <input id="speed" type="range" min="1" max="5" value="1"><output id="speedVal">۱×</output></label>
+    <span id="zodiacInfo" class="zodiac-info"></span>
+  </section>
 
-</section>
-<section class="stats" id="stats" aria-live="polite"></section>\n<section class="panel world-panel"><div class="world-head"><div><h2>جهان زنده اکوسیستم</h2><p>موجودات را انتخاب کن تا وضعیتشان را ببینی.</p></div><span class="live-tag">● شبیه‌سازی زنده</span></div><canvas id="world" aria-label="نمای متحرک اکوسیستم" role="img"></canvas><div id="entityDetail" class="entity-detail">برای مشاهده جزئیات، روی یکی از موجودات کلیک کن.</div></section>
-<section class="grid">
-<article class="panel">
-<h2>چرخه اصلی اکوسیستم</h2>
-<div class="flow">
-<div class="node sun">☀ خورشید هوشمند<br><small>انرژی · حافظه · توازن</small></div><div class="arrow">↓ انرژی</div>
-<div class="node">۱. تولد از انرژی خورشید</div><div class="arrow">↓</div>
-<div class="node">۲. رشد با نور، آب و خاک</div><div class="arrow">↓</div>
-<div class="node">۳. بلوغ، تغذیه و تعامل گونه‌ها</div><div class="arrow">↓</div>
-<div class="node">۴. پیری و افول</div><div class="arrow">↓ مواد و انرژی به چرخه</div>
-<div class="node sun">۵. بازگشت به چرخه مواد</div><div class="arrow">↺ خورشید وضعیت را ارزیابی و سیاست بعدی را انتخاب می‌کند</div>
-</div>
-<p class="hint">مدل نمادین و قابل آزمایش است؛ انرژی برگشتی وارد چرخه مواد و حافظه خورشید می‌شود، نه اینکه موجودات فیزیکی به سطح خورشید بروند.</p>
-</article>
-<article class="panel">
-<h2>وضعیت مراحل حیات</h2><div id="population" class="population"></div><h2>گونه‌ها</h2><div id="species" class="species-list"></div><h2>سیاست فعلی خورشید</h2><p id="policy" class="policy">تعادل</p><h2>روند پایداری</h2><div id="history" class="history"></div>
-<h2>رویدادهای اخیر</h2><ol id="events" class="events"></ol>
-</article>
-</section>
-<section class="panel">
-<h2>منطق و قواعد مدل</h2>
-<ul class="rules">
-<li>خورشید سیاست ترمیم، صرفه‌جویی، تعادل یا تنوع را با ارزیابی وضعیت و امتیازهای ثبت‌شده انتخاب می‌کند.</li><li>محیط فصل، نور، دما، آب، خاک، مواد مغذی و زیست‌توده دارد.</li><li>تولیدکنندگان از نور و منابع رشد می‌کنند؛ مصرف‌کنندگان از زیست‌توده تغذیه می‌کنند؛ شکارچی فشار گیاه‌خواران را تغییر می‌دهد؛ تجزیه‌کنندگان مواد را به خاک بازمی‌گردانند.</li><li>هر موجود سن، انرژی، سلامت، رشد، مرحله حیات و نسبت خانوادگی دارد؛ تولیدمثل به شرایط و انرژی وابسته است.</li><li>در پایان عمر، موجود به مرحله بازگشت می‌رود؛ مواد مغذی آزاد می‌شوند و خورشید اثر چرخه را در حافظه محدود ثبت می‌کند.</li><li>این یک مدل مفهومی با پارامترهای فرضی است، نه شبیه‌سازی علمی زمین یا خورشید.</li>
-</ul>
-</section>
+  <section class="stats" id="stats" aria-live="polite"></section>
+
+  <section class="panel world-panel">
+    <div class="world-head">
+      <div><h2>جهان زنده اکوسیستم</h2><p>موجودات را انتخاب کن تا وضعیتشان را ببینی.</p></div>
+      <span class="live-tag">● شبیه‌سازی زنده</span>
+    </div>
+    <canvas id="world" aria-label="نمای متحرک اکوسیستم و حلقه زودیاک" role="img"></canvas>
+    <div id="entityDetail" class="entity-detail">برای مشاهده جزئیات، روی یکی از موجودات یا گره‌های درخت حیات کلیک کن.</div>
+  </section>
+
+  <section class="lifecycle-strip panel">
+    <h2>چرخه حیات (نور خورشید تا بازگشت دوباره)</h2>
+    <div id="lifeCycle" class="lc-row"></div>
+  </section>
+
+  <section class="grid">
+    <article class="panel">
+      <h2>چرخه اصلی اکوسیستم</h2>
+      <div class="flow">
+        <div class="node sun">☀ خورشید هوشمند<br><small>انرژی · حافظه · رشد پلکانی</small></div><div class="arrow">↓ انرژی</div>
+        <div class="node">۱. تولد از انرژی خورشید</div><div class="arrow">↓</div>
+        <div class="node">۲. رشد با نور، آب و خاک</div><div class="arrow">↓</div>
+        <div class="node">۳. بلوغ، تغذیه و تعامل گونه‌ها</div><div class="arrow">↓</div>
+        <div class="node">۴. پیری و افول</div><div class="arrow">↓ مواد و انرژی به چرخه</div>
+        <div class="node sun">۵. بازگشت به چرخه مواد</div><div class="arrow">↺ خورشید وضعیت را ارزیابی و سیاست بعدی را انتخاب می‌کند</div>
+      </div>
+      <p class="hint">مدل نمادین و قابل آزمایش است؛ انرژی برگشتی وارد چرخه مواد و حافظه خورشید می‌شود، نه اینکه موجودات فیزیکی به سطح خورشید بروند.</p>
+    </article>
+
+    <article class="panel tree-panel">
+      <h2>درخت حیات (۱۰ سفیروت · ۳ ستون · ۲۲ مسیر)</h2>
+      <p class="hint">هر بار که سلامت اکوسیستم بهبود پیدا کند، خورشید «رشد» می‌کند و یک پله در درخت حیات بالا می‌رود؛ در کتر، دوباره از ملکوت آغاز می‌کند (چرخه بی‌نهایت).</p>
+      <div id="treeOfLife" class="tree-wrap"></div>
+    </article>
+
+    <article class="panel">
+      <h2>وضعیت مراحل حیات</h2><div id="population" class="population"></div>
+      <h2>گونه‌ها</h2><div id="species" class="species-list"></div>
+      <h2>سیاست فعلی خورشید</h2><p id="policy" class="policy"></p>
+      <h2>روند پایداری</h2><div id="history" class="history"></div>
+      <h2>رویدادهای اخیر</h2><ol id="events" class="events"></ol>
+    </article>
+  </section>
+
+  <section class="panel">
+    <h2>منطق و قواعد مدل</h2>
+    <ul class="rules">
+      <li>خورشید سیاست ترمیم، صرفه‌جویی، تعادل یا تنوع را با ارزیابی وضعیت و امتیازهای ثبت‌شده انتخاب می‌کند و ستون متناظر در درخت حیات را شارژ می‌کند.</li>
+      <li>حلقه زودیاک (۱۲ نشان) نور، دما و آب محیط را در طول ۳۶۰ روز مدل تغییر می‌دهد.</li>
+      <li>محیط فصل، نور، دما، آب، خاک، مواد مغذی و زیست‌توده دارد.</li>
+      <li>تولیدکنندگان از نور و منابع رشد می‌کنند؛ مصرف‌کنندگان از زیست‌توده تغذیه می‌کنند؛ شکارچی فشار مصرف‌کنندگان را تغییر می‌دهد؛ تجزیه‌کننده مواد را به خاک بازمی‌گرداند.</li>
+      <li>هر موجود سن، انرژی، سلامت، رشد، مرحله حیات و نسبت خانوادگی دارد؛ تولیدمثل به شرایط و انرژی وابسته است.</li>
+      <li>خورشید مانند یک عامل یادگیرنده، با بهبود سلامت اکوسیستم «تجربه» می‌گیرد و در درخت حیات از ملکوت تا کتر رشد می‌کند؛ رسیدن به کتر یک چرخه کامل و بازگشت به ابتدا را رقم می‌زند.</li>
+      <li>این یک مدل مفهومی و نمادین با پارامترهای فرضی است، نه شبیه‌سازی علمی زمین، خورشید یا ادعای عرفانی واقعی.</li>
+    </ul>
+  </section>
 </main>
-<footer>SunP · شبیه‌سازی نمادین چرخه حیات و اکوسیستم</footer>
+<footer>SunP · شبیه‌سازی نمادین چرخه حیات، زودیاک و درخت حیات</footer>
 <script type="module" src="./src/main.js"></script>
 </body></html>
