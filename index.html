@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07122e"><title>شبیه‌ساز چرخه حیات خورشید</title>
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<header><div><span class="eyebrow">SUNP · مدل نمادین</span><h1>شبیه‌ساز چرخه حیات</h1><p>آزمایش منطق اکوسیستم، بدون صحنه گرافیکی</p></div><div class="sunmark" aria-hidden="true">☀</div></header>
+<main>
+<section class="toolbar panel">
+<button id="toggle">▶ شروع</button><button id="step">گام بعدی</button><button id="reset" class="secondary">بازنشانی</button>
+<label>سرعت <input id="speed" type="range" min="1" max="5" value="1"><output id="speedVal">۱×</output></label>
+<label class="check"><input id="auto" type="checkbox" checked> تولید خودکار موجودات</label>
+</section>
+<section class="stats" id="stats" aria-live="polite"></section>
+<section class="grid">
+<article class="panel">
+<h2>چرخه اصلی</h2>
+<div class="flow">
+<div class="node sun">☀ خورشید هوشمند<br><small>انرژی · حافظه · توازن</small></div><div class="arrow">↓ انرژی</div>
+<div class="node">۱. تولد موجود</div><div class="arrow">↓</div>
+<div class="node">۲. رشد در محیط</div><div class="arrow">↓</div>
+<div class="node">۳. بلوغ و تعامل</div><div class="arrow">↓</div>
+<div class="node">۴. افول</div><div class="arrow">↓ بازگشت انرژی</div>
+<div class="node sun">۵. بازگشت به خورشید</div><div class="arrow">↺ خورشید تجربه می‌آموزد و چرخه را تنظیم می‌کند</div>
+</div>
+<p class="hint">این نسخه، چرخه را با قواعد عددی ساده شبیه‌سازی می‌کند. رشد خورشید به‌صورت سطح و حافظه نمادین نمایش داده می‌شود؛ نه هوش مصنوعی خودآموز واقعی.</p>
+</article>
+<article class="panel">
+<h2>وضعیت موجودات</h2><div id="population" class="population"></div>
+<h2>رویدادهای اخیر</h2><ol id="events" class="events"></ol>
+</article>
+</section>
+<section class="panel">
+<h2>قواعد مدل</h2>
+<ul class="rules">
+<li>خورشید در هر گام انرژی پایه تولید می‌کند.</li><li>موجودات با مصرف انرژی رشد می‌کنند و پس از بلوغ وارد افول می‌شوند.</li><li>در پایان عمر، موجود به مرحله بازگشت می‌رود و انرژی به خورشید می‌رسد.</li><li>خورشید با شمارش بازگشت‌ها، جمعیت زنده و توازن، سطح و زمان تولد بعدی را تنظیم می‌کند.</li><li>همه مقادیر فرضی و قابل تغییرند؛ این مدل ادعای زیست‌شناختی یا کیهانی ندارد.</li>
+</ul>
+</section>
+</main>
+<footer>نمونه اولیه غیرگرافیکی · SunP</footer>
+<script type="module" src="./src/main.js"></script>
+</body></html>
