@@ -63,7 +63,7 @@ function interact(w){
 }
 function lifecycle(w){
  for(const e of w.entities){if(e.stage==="return")continue;e.age++;e.energy-=spec(e.key).need*.12;
-  if(e.health<35)e.stress++;else e.stress=Math.max(0,e.stress-1);
+  if(e.health<35)e.stress++;else e.stress=Math.max(0,e.stress-1);\n  e.growth=clamp(Math.max(e.growth,e.age/Math.max(1,e.life)),0,1);\n  e.x=clamp(e.x+Math.sin((w.tick+e.id)*.13)*.0015,.04,.96);\n  e.y=clamp(e.y+Math.cos((w.tick+e.id)*.11)*.0012,.04,.96);
   if(e.stage==="seed"&&e.age>=2)e.stage="sprout";
   else if(e.stage==="sprout"){e.growth=clamp(e.growth+.08,0,1);if(e.growth>=1)e.stage="juvenile"}
   else if(e.stage==="juvenile"&&e.age>=8)e.stage="adult";
