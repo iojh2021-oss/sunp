@@ -124,7 +124,8 @@ function lifecycle(w){
   else if(e.stage==="sprout"&&e.growth>=.12)e.stage="juvenile";
   else if(e.stage==="juvenile"&&e.age>=Math.max(7,e.life*.12))e.stage="adult";
   else if(e.stage==="adult"&&e.age>=e.life*.68)e.stage="aging";
-  e.health=clamp(e.health,0,100);\n  if(e.energy<2||e.health<=0||e.age>=e.life){
+  e.health=clamp(e.health,0,100);
+  if(e.energy<2||e.health<=0||e.age>=e.life){
    e.stage="return";e.health=0;w.stats.deaths++;w.stats.returns++;
    w.sun.energy=clamp(w.sun.energy+Math.max(0,e.energy)*.12,0,100);
    w.environment.detritus=clamp(w.environment.detritus+Math.max(.1,e.biomass),0,100);
