@@ -485,24 +485,50 @@ function predictPolicyOutcome(world, policy, horizon=PLAN_HORIZON){
  }
  return score/horizon;
 }
+// هم‌مقیاس‌سازی خروجی شبکه و جدول ارزش با امتیاز برنامه‌ریزی.
+const normalizeLearnedValue = value => .5 + .5 * Math.tanh(value / 4);
+function evaluatePolicies(world, features, vals, visits) {
+  const memory=world.sun.replay||[];
+  const neural=neuralForward(world.sun.neural,features).output;
+  const totalVisits=SUN_POLICIES.reduce((sum,p)=>sum+(visits[p]||0),0);
+  return SUN_POLICIES.map((policy,action)=>{
+    let rollout=0;
+    for(let h=1;h<=PLAN_HORIZON;h++)rollout+=predictPolicyOutcome(world,policy,h)/h;
+    rollout/=PLAN_HORIZON;
+    let similar=0,weight=0;
+    for(const m of memory){
+      if(m.action!==action)continue;
+      const sim=stateSimilarity(features,m.features);
+      similar+=sim*normalizeLearnedValue(m.target);weight+=sim;
+    }
+    const recalled=weight?similar/weight:.5;
+    const tabular=normalizeLearnedValue(vals[policy]||0);
+    const learned=normalizeLearnedValue(neural[action]);
+    const confidence=1-Math.exp(-weight/3);
+    const score=.36*rollout+.28*learned+.22*tabular+.14*recalled;
+    const exploration=.035*Math.sqrt(Math.log(totalVisits+2)/((visits[policy]||0)+1));
+    return {policy,action,score,rollout,learned,tabular,recalled,confidence,exploration,
+      decisionScore:score+exploration,visits:visits[policy]||0};
+  });
+}
 function planPolicy(world,features){
- const memory=world.sun.replay||[];
- return SUN_POLICIES.map((policy,action)=>{
-  let rollout=0;for(let h=1;h<=PLAN_HORIZON;h++)rollout+=predictPolicyOutcome(world,policy,h)/h;
-  rollout/=PLAN_HORIZON;
-  let similar=0,weight=0;
-  for(const m of memory){if(m.action!==action)continue;const sim=stateSimilarity(features,m.features);similar+=sim*m.target;weight+=sim;}
-  const recalled=weight?similar/weight:0;
-  const learned=neuralForward(world.sun.neural,features).output[action];
-  return .48*rollout+.32*learned+.20*recalled;
- });
+  const key=world.challenge?world.challenge.type:"calm";
+  const vals=ensureState(world.sun,key);
+  return evaluatePolicies(world,features,vals,world.sun.visits[key]).map(x=>x.decisionScore);
+}
+export function getSunDecisionReport(world) {
+  const key=world.challenge?world.challenge.type:"calm";
+  const vals=ensureState(world.sun,key);
+  const features=neuralFeatures(world);
+  const ranked=evaluatePolicies(world,features,vals,world.sun.visits[key]).sort((a,b)=>b.decisionScore-a.decisionScore);
+  return {state:key,selected:ranked[0]?.policy||"balance",policies:ranked.map(({policy,score,rollout,learned,tabular,recalled,confidence,exploration,visits})=>({policy,score,rollout,learned,tabular,recalled,confidence,exploration,visits}))};
 }
 function sunDecidePolicy(world, policyOverride=null) {
   const sun=world.sun,key=world.challenge?world.challenge.type:"calm";
   const vals=ensureState(sun,key),eps=Math.max(.025,.2-.012*sun.level-.01*sun.wisdomCycles);
-  const features=neuralFeatures(world),prediction=neuralForward(sun.neural,features).output;
-  const planned=planPolicy(world,features);
-  const qValues=SUN_POLICIES.map((p,i)=>.25*vals[p]+.45*prediction[i]+.30*planned[i]);
+  const features=neuralFeatures(world);
+  const evaluations=evaluatePolicies(world,features,vals,sun.visits[key]);
+  const qValues=evaluations.map(x=>x.decisionScore);
   let action=0;
   if(policyOverride && SUN_POLICIES.includes(policyOverride))action=SUN_POLICIES.indexOf(policyOverride);
   else if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);
