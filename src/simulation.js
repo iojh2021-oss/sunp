@@ -213,6 +213,7 @@ function defaultSun() {
     visits: {},
     best: {},
     memory: [],
+    replay: [],
     xp: 0,
     level: 1,
     wisdomCycles: 0,
@@ -267,6 +268,7 @@ export function sanitizeMemory(raw) {
       wisdomCycles: Math.floor(num(s.wisdomCycles, 0, 0, 1e6)),
       experienceTotal: num(s.experienceTotal, 0, 0, 1e9),
       neural,
+      memory: Array.isArray(s.memory) ? s.memory.slice(-256).filter(m => m && Array.isArray(m.features) && m.features.length === NN_INPUTS && Number.isInteger(m.action) && m.action >= 0 && m.action < NN_OUTPUTS).map(m => ({ features: m.features.map(v => num(v, 0, -1, 1)), action: m.action, target: num(m.target, 0, -20, 20) })) : [],
       pillarCharge: {
         mercy: num(pc.mercy, 10, 0, 100),
         severity: num(pc.severity, 10, 0, 100),
@@ -302,6 +304,7 @@ function applyMemory(world, mem) {
   sun.experienceTotal = clean.sun.experienceTotal;
   sun.pillarCharge = clean.sun.pillarCharge;
   sun.neural = clean.sun.neural;
+  sun.replay = clean.sun.memory;
   for (const key of Object.keys(sun.values)) sun.best[key] = bestPolicy(sun.values[key]);
   world.stats = { ...clean.stats, epochs: clean.stats.epochs + 1 };
   return true;
@@ -466,8 +469,19 @@ function sunLearn(world, reward) {
   const alpha = Math.max(0.03, 1 / (visits[sun.policy] + 2));
   vals[sun.policy] = clamp(vals[sun.policy] + alpha * (reward - vals[sun.policy]), -50, 50);
   if(Array.isArray(sun.lastFeatures)&&sun.lastFeatures.length===NN_INPUTS){
-    const bootstrap=Math.max(...neuralForward(sun.neural,neuralFeatures(world)).output);
-    trainNeural(sun.neural,sun.lastFeatures,sun.lastActionIndex,Math.max(-20,Math.min(20,reward+.88*bootstrap)));
+    const nextFeatures=neuralFeatures(world);
+    const bootstrap=Math.max(...neuralForward(sun.neural,nextFeatures).output);
+    const target=Math.max(-20,Math.min(20,reward+.88*bootstrap));
+    const sample={features:sun.lastFeatures.slice(),action:sun.lastActionIndex,target};
+    sun.replay.push(sample);
+    if(sun.replay.length>256)sun.replay.shift();
+    // تجربه‌های تازه و گذشته هر دو آموزش می‌دهند؛ حافظه‌ی محدود، پایدار و قابل ذخیره است.
+    trainNeural(sun.neural,sample.features,sample.action,sample.target);
+    const replayCount=Math.min(4,sun.replay.length);
+    for(let i=0;i<replayCount;i++){
+      const old=sun.replay[Math.floor(world.rng()*sun.replay.length)];
+      trainNeural(sun.neural,old.features,old.action,old.target);
+    }
   }
   sun.memory.push({ policy: sun.policy, state: key, reward, tick: world.tick });
   if (sun.memory.length > 24) sun.memory.shift();
