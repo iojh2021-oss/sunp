@@ -113,3 +113,41 @@ test("اجرای طولانی بدون خطا؛ جمعیت منقرض نمی‌�
     assert.ok(w.population.length <= w.populationCap + 5);
   }
 });
+
+
+test("شبکه عصبی واقعاً به‌روزرسانی می‌شود و replay محدود می‌ماند", () => {
+  const w = runN(createWorld(123), 1800);
+  assert.ok(w.sun.neural.updates > 0);
+  assert.ok(w.sun.replay.length > 0 && w.sun.replay.length <= 256);
+  assert.ok(w.sun.neural.w1.every(row => row.every(Number.isFinite)));
+  assert.ok(w.sun.neural.w2.every(row => row.every(Number.isFinite)));
+  const restored = createWorld(456, JSON.parse(JSON.stringify(exportMemory(w))));
+  assert.equal(restored.sun.neural.updates, w.sun.neural.updates);
+  assert.equal(restored.sun.replay.length, w.sun.replay.length);
+});
+
+test("خشکسالی ممتد و کمبود منابع: مقادیر متناهی و جمعیت در ظرفیت باقی می‌ماند", () => {
+  const w = createWorld(818);
+  w.env.water = 3;
+  w.env.soil = 8;
+  w.env.nutrients = 4;
+  w.challenge = { type: "drought", severity: 0.95, duration: 250, remaining: 250 };
+  runN(w, 250);
+  for (const key of ["light", "temp", "water", "soil", "nutrients", "oxygen", "biomass", "organic"]) {
+    assert.ok(Number.isFinite(w.env[key]), key);
+    assert.ok(w.env[key] >= 0 && w.env[key] <= 100, key);
+  }
+  assert.ok(w.population.length <= w.populationCap + 5);
+  assert.ok(Number.isFinite(w.healthIndex));
+});
+
+test("انقراض گونه‌ها/جمعیت و بازیابی موتور بدون NaN", () => {
+  const w = createWorld(919);
+  w.population = w.population.filter(e => e.species !== "predator" && e.species !== "aquatic");
+  w.env.biomass = 2;
+  w.env.water = 1;
+  runN(w, 1200);
+  assert.ok(Number.isFinite(w.healthIndex));
+  assert.ok(w.population.every(e => Number.isFinite(e.health) && Number.isFinite(e.energy)));
+  assert.ok(w.sun.neural.updates > 0);
+});
