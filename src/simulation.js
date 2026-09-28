@@ -175,34 +175,57 @@ function bestPolicy(vals) {
   return best;
 }
 
-const NN_INPUTS=11, NN_HIDDEN=8, NN_OUTPUTS=SUN_POLICIES.length;
+const NN_INPUTS=15, NN_OUTPUTS=SUN_POLICIES.length;
+const NN_SHAPE=[NN_INPUTS,24,16,12,NN_OUTPUTS];
 function freshNetwork(){
- return {
-  w1:Array.from({length:NN_HIDDEN},(_,h)=>Array.from({length:NN_INPUTS},(_,i)=>Math.sin((h+1)*(i+3))*.08)),
-  b1:Array(NN_HIDDEN).fill(0),
-  w2:Array.from({length:NN_OUTPUTS},(_,o)=>Array.from({length:NN_HIDDEN},(_,h)=>Math.cos((o+2)*(h+1))*.08)),
-  b2:Array(NN_OUTPUTS).fill(0),updates:0
- };
+ const layers=[];
+ for(let l=0;l<NN_SHAPE.length-1;l++){
+  const fanIn=NN_SHAPE[l],fanOut=NN_SHAPE[l+1],scale=Math.sqrt(2/(fanIn+fanOut));
+  layers.push({
+   w:Array.from({length:fanOut},(_,o)=>Array.from({length:fanIn},(_,i)=>Math.sin((l+1)*97+(o+1)*17+(i+1)*13)*scale)),
+   b:Array(fanOut).fill(0)
+  });
+ }
+ return {layers,w1:layers[0].w,b1:layers[0].b,w2:layers[layers.length-1].w,b2:layers[layers.length-1].b,updates:0};
 }
 function neuralFeatures(world){
- const e=world.env,c=world.challenge;
- return [e.light/100,e.temp/60,e.water/100,e.soil/100,e.nutrients/100,e.oxygen/100,e.biomass/100,world.healthIndex/100,c?1:0,c?c.severity:0,world.sun.level/10]
- .map(v=>Math.max(-1,Math.min(1,v*2-1)));
+ const e=world.env,c=world.challenge,p=world.population;
+ const counts={};for(const x of p)counts[x.species]=(counts[x.species]||0)+1;
+ const norm=v=>Math.max(-1,Math.min(1,v*2-1));
+ return [e.light/100,(e.temp+20)/80,e.water/100,e.soil/100,e.nutrients/100,e.oxygen/100,e.biomass/100,e.organic/100,
+  world.healthIndex/100,Math.min(1,p.length/world.populationCap),Math.min(1,(counts.tree||0)/10),Math.min(1,(counts.flower||0)/10),
+  Math.min(1,((counts.herbivore||0)+(counts.pollinator||0)+(counts.aquatic||0))/20),c?1:0,c?c.severity:0,world.sun.level/10].map(norm);
 }
 function neuralForward(net,x){
- const hidden=net.b1.map((b,h)=>Math.tanh(b+net.w1[h].reduce((s,w,i)=>s+w*x[i],0)));
- return {hidden,output:net.b2.map((b,o)=>b+net.w2[o].reduce((s,w,h)=>s+w*hidden[h],0))};
+ const activations=[x.slice()];
+ for(let l=0;l<net.layers.length;l++){
+  const layer=net.layers[l],last=l===net.layers.length-1;
+  activations.push(layer.b.map((b,o)=>{
+   const z=b+layer.w[o].reduce((sum,w,i)=>sum+w*activations[l][i],0);
+   return last?z:Math.tanh(z);
+  }));
+ }
+ return {hidden:activations[activations.length-2],output:activations[activations.length-1],activations};
 }
 function trainNeural(net,x,action,target){
- const {hidden,output}=neuralForward(net,x),error=Math.max(-10,Math.min(10,target-output[action]));
- const lr=.025/Math.sqrt(1+net.updates/500),old=net.w2[action].slice();
- net.b2[action]=Math.max(-20,Math.min(20,net.b2[action]+lr*error));
- for(let h=0;h<NN_HIDDEN;h++)net.w2[action][h]=Math.max(-5,Math.min(5,net.w2[action][h]+lr*error*hidden[h]));
- for(let h=0;h<NN_HIDDEN;h++){
-  const grad=error*old[h]*(1-hidden[h]*hidden[h]);
-  net.b1[h]=Math.max(-5,Math.min(5,net.b1[h]+lr*grad));
-  for(let i=0;i<NN_INPUTS;i++)net.w1[h][i]=Math.max(-5,Math.min(5,net.w1[h][i]+lr*grad*x[i]));
+ const pass=neuralForward(net,x),last=net.layers.length-1;
+ const error=Math.max(-5,Math.min(5,target-pass.output[action]));
+ const lr=.012/Math.sqrt(1+net.updates/800);
+ const deltas=Array(net.layers.length);
+ deltas[last]=pass.output.map((_,o)=>o===action?error:0);
+ for(let l=last-1;l>=0;l--){
+  const next=net.layers[l+1],deltaNext=deltas[l+1],a=pass.activations[l+1];
+  deltas[l]=a.map((v,i)=>(1-v*v)*next.w.reduce((sum,row,o)=>sum+row[i]*deltaNext[o],0));
  }
+ for(let l=0;l<net.layers.length;l++){
+  const layer=net.layers[l],input=pass.activations[l],delta=deltas[l];
+  for(let o=0;o<layer.w.length;o++){
+   layer.b[o]=Math.max(-8,Math.min(8,layer.b[o]+lr*delta[o]));
+   for(let i=0;i<layer.w[o].length;i++)layer.w[o][i]=Math.max(-4,Math.min(4,layer.w[o][i]+lr*delta[o]*input[i]));
+  }
+ }
+ net.w1=net.layers[0].w;net.b1=net.layers[0].b;
+ net.w2=net.layers[last].w;net.b2=net.layers[last].b;
  net.updates++;
 }
 function defaultSun() {
@@ -250,13 +273,11 @@ export function sanitizeMemory(raw) {
   }
   const pc = s.pillarCharge || {};
   const rawNet=s.neural||{},fallback=freshNetwork();
-  const neural={
-    w1:Array.from({length:NN_HIDDEN},(_,h)=>Array.from({length:NN_INPUTS},(_,i)=>num(rawNet.w1?.[h]?.[i],fallback.w1[h][i],-5,5))),
-    b1:Array.from({length:NN_HIDDEN},(_,h)=>num(rawNet.b1?.[h],0,-5,5)),
-    w2:Array.from({length:NN_OUTPUTS},(_,o)=>Array.from({length:NN_HIDDEN},(_,h)=>num(rawNet.w2?.[o]?.[h],fallback.w2[o][h],-5,5))),
-    b2:Array.from({length:NN_OUTPUTS},(_,o)=>num(rawNet.b2?.[o],0,-20,20)),
-    updates:Math.floor(num(rawNet.updates,0,0,1e9)),
-  };
+  const layers=fallback.layers.map((base,l)=>({
+    w:base.w.map((row,o)=>row.map((v,i)=>num(rawNet.layers?.[l]?.w?.[o]?.[i],v,-4,4))),
+    b:base.b.map((v,o)=>num(rawNet.layers?.[l]?.b?.[o],0,-8,8)),
+  }));
+  const neural={layers,w1:layers[0].w,b1:layers[0].b,w2:layers[layers.length-1].w,b2:layers[layers.length-1].b,updates:Math.floor(num(rawNet.updates,0,0,1e9))};
   const st = raw.stats || {};
   return {
     version: MEMORY_VERSION,
