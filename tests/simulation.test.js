@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import {
   createWorld, step, ZODIAC, SEPHIROT, PATHS_22, getTreeOfLifeState, getCurrentZodiac,
-  exportMemory, sanitizeMemory, getLessons, getSunBonus,
+  exportMemory, sanitizeMemory, getLessons, getSunBonus, benchmarkPolicies,
 } from "../src/simulation.js";
 
 const runN = (w, n) => { for (let i = 0; i < n; i++) step(w); return w; };
@@ -150,4 +150,16 @@ test("انقراض گونه‌ها/جمعیت و بازیابی موتور بد�
   assert.ok(Number.isFinite(w.healthIndex));
   assert.ok(w.population.every(e => Number.isFinite(e.health) && Number.isFinite(e.energy)));
   assert.ok(w.sun.neural.updates > 0);
+});
+
+test("برنامه‌ریزی و حافظه تجربه: خروجی‌ها متناهی‌اند و جهان زنده هنگام پیش‌بینی تغییر نمی‌کند", () => {
+  const w = runN(createWorld(77), 120);
+  const before = JSON.stringify({env:w.env,population:w.population,tick:w.tick});
+  const report = benchmarkPolicies({seeds:[11,22],ticks:80});
+  assert.equal(JSON.stringify({env:w.env,population:w.population,tick:w.tick}),before);
+  for (const policy of ["repair","conserve","balance","diversity"]) {
+    assert.ok(Number.isFinite(report.results[policy].meanHealth));
+    assert.ok(Number.isFinite(report.results[policy].meanRichness));
+    assert.equal(report.results[policy].runs.length,2);
+  }
 });
