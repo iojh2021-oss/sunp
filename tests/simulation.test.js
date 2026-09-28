@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import {
   createWorld, step, ZODIAC, SEPHIROT, PATHS_22, getTreeOfLifeState, getCurrentZodiac,
-  exportMemory, sanitizeMemory, getLessons, getSunBonus, benchmarkPolicies, getSunDecisionReport,
+  exportMemory, sanitizeMemory, getLessons, getSunBonus, benchmarkPolicies, benchmarkEcosystem, getSunDecisionReport,
 } from "../src/simulation.js";
 
 const runN = (w, n) => { for (let i = 0; i < n; i++) step(w); return w; };
@@ -177,4 +177,23 @@ test("گزارش تصمیم خورشید همه سیاست‌ها و امتیا�
     assert.ok(row.confidence >= 0 && row.confidence <= 1);
   }
   assert.equal(JSON.stringify({env:w.env,population:w.population,tick:w.tick,sun:w.sun}), before);
+});
+
+test("مقایسه‌ی بقای عامل یادگیرنده با خط‌پایه روی بذرهای یکسان", () => {
+  const report = benchmarkEcosystem({seeds:[101,202],ticks:360,window:80});
+  assert.deepEqual(report.seeds,[101,202]);
+  for (const variant of ["adaptiveAI","heuristicBaseline"]) {
+    const row=report.results[variant];
+    assert.equal(row.runs.length,2);
+    for (const key of ["meanAliveRate","meanHealth","meanPopulation","meanRichness","meanFinalRichness","meanChallengeSurvivalRate"]) {
+      assert.ok(Number.isFinite(row[key]), variant+" "+key);
+    }
+    for (const run of row.runs) {
+      assert.ok(run.aliveRate>=0 && run.aliveRate<=1);
+      assert.ok(run.challengeSurvivalRate>=0 && run.challengeSurvivalRate<=1);
+      assert.ok(run.minimumPopulation>=0);
+    }
+  }
+  assert.ok(Number.isFinite(report.deltas.meanAliveRate));
+  assert.ok(Number.isFinite(report.deltas.meanHealth));
 });
