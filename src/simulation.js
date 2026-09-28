@@ -518,9 +518,10 @@ function planPolicy(world,features){
 }
 export function getSunDecisionReport(world) {
   const key=world.challenge?world.challenge.type:"calm";
-  const vals=ensureState(world.sun,key);
+  const vals=world.sun.values[key]||zeroPolicies();
+  const visits=world.sun.visits[key]||zeroPolicies();
   const features=neuralFeatures(world);
-  const ranked=evaluatePolicies(world,features,vals,world.sun.visits[key]).sort((a,b)=>b.decisionScore-a.decisionScore);
+  const ranked=evaluatePolicies(world,features,vals,visits).sort((a,b)=>b.decisionScore-a.decisionScore);
   return {state:key,selected:ranked[0]?.policy||"balance",policies:ranked.map(({policy,score,rollout,learned,tabular,recalled,confidence,exploration,visits})=>({policy,score,rollout,learned,tabular,recalled,confidence,exploration,visits}))};
 }
 function sunDecidePolicy(world, policyOverride=null) {
