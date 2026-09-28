@@ -69,6 +69,7 @@ def train(args):
             nonterminal=1-done[t];delta=rew[t]+args.gamma*nv*nonterminal-val[t]
             gae=delta+args.gamma*args.gae_lambda*nonterminal*gae;adv[t]=gae
         returns=adv+val
+        n=len(adv)
         batch={"obs":torch.stack(observations),"action":torch.stack(actions),"old_logp":torch.stack(logps),"adv":adv,"returns":returns}
         rollout_td=TensorDict(batch,batch_size=[n])
         replay=ReplayBuffer(storage=LazyTensorStorage(max_size=args.rollout))
