@@ -441,57 +441,53 @@ function weakestPillar(sun) {
 }
 
 function sunDecidePolicy(world) {
-  const sun = world.sun;
-  const key = world.challenge ? world.challenge.type : "calm";
-  const vals = ensureState(sun, key);
-  const eps=Math.max(.025,.2-.012*sun.level-.01*sun.wisdomCycles);
+  const sun=world.sun,key=world.challenge?world.challenge.type:"calm";
+  const vals=ensureState(sun,key),eps=Math.max(.025,.2-.012*sun.level-.01*sun.wisdomCycles);
   const features=neuralFeatures(world),prediction=neuralForward(sun.neural,features).output;
   const qValues=SUN_POLICIES.map((p,i)=>.35*vals[p]+.65*prediction[i]);
   let action=0;
   if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);
   else {let best=-Infinity;for(let i=0;i<qValues.length;i++)if(qValues[i]>best){best=qValues[i];action=i}}
-  const policy=SUN_POLICIES[action];
-  sun.lastFeatures=features;sun.lastActionIndex=action;
-  sun.lastState=key;sun.policy=policy;
+  sun.lastFeatures=features;sun.lastActionIndex=action;sun.lastState=key;sun.policy=SUN_POLICIES[action];
+  const pillar=sun.policy==="repair"?"mercy":sun.policy==="conserve"?"severity":sun.policy==="balance"?"balance":weakestPillar(sun);
+  sun.pillarCharge[pillar]=clamp(sun.pillarCharge[pillar]+9);
+  for(const k of Object.keys(sun.pillarCharge))if(k!==pillar)sun.pillarCharge[k]=clamp(sun.pillarCharge[k]-2.5);
+}
 
-  const pillar = policy === "repair" ? "mercy" : policy === "conserve" ? "severity" : policy === "balance" ? "balance" : weakestPillar(sun);
-  sun.pillarCharge[pillar] = clamp(sun.pillarCharge[pillar] + 9);
-  for (const k of Object.keys(sun.pillarCharge)) if (k !== pillar) sun.pillarCharge[k] = clamp(sun.pillarCharge[k] - 2.5);
+// Policy effects are scored against a normalized ecosystem objective, not raw health delta alone.
+function ecosystemObjective(world) {
+ const e=world.env,p=world.population,counts={};
+ for(const x of p)counts[x.species]=(counts[x.species]||0)+1;
+ const richness=Object.keys(counts).length/Math.max(1,Object.keys(SPECIES).length);
+ const resource=[e.water,e.soil,e.nutrients,e.oxygen,e.biomass].reduce((a,v)=>a+v,0)/500;
+ const health=p.length?p.reduce((a,x)=>a+x.health,0)/p.length/100:0;
+ const roleBalance=clamp(100-Math.abs((counts.tree||0)+(counts.flower||0)-(counts.herbivore||0)-(counts.pollinator||0)-(counts.aquatic||0))*2,0,100)/100;
+ const diversity=richness;
+ return .35*health+.25*resource+.2*diversity+.2*roleBalance;
 }
 
 // یادگیری: پاداش این گام به سیاستی که در این گام اجرا شد نسبت داده می‌شود
 function sunLearn(world, reward) {
-  const sun = world.sun;
-  const key = sun.lastState;
-  const vals = ensureState(sun, key);
-  const visits = sun.visits[key];
-  visits[sun.policy] += 1;
-  const alpha = Math.max(0.03, 1 / (visits[sun.policy] + 2));
-  vals[sun.policy] = clamp(vals[sun.policy] + alpha * (reward - vals[sun.policy]), -50, 50);
-  if(Array.isArray(sun.lastFeatures)&&sun.lastFeatures.length===NN_INPUTS){
-    const nextFeatures=neuralFeatures(world);
-    const bootstrap=Math.max(...neuralForward(sun.neural,nextFeatures).output);
-    const target=Math.max(-20,Math.min(20,reward+.88*bootstrap));
-    const sample={features:sun.lastFeatures.slice(),action:sun.lastActionIndex,target};
-    sun.replay.push(sample);
-    if(sun.replay.length>256)sun.replay.shift();
-    // تجربه‌های تازه و گذشته هر دو آموزش می‌دهند؛ حافظه‌ی محدود، پایدار و قابل ذخیره است.
-    trainNeural(sun.neural,sample.features,sample.action,sample.target);
-    const replayCount=Math.min(4,sun.replay.length);
-    for(let i=0;i<replayCount;i++){
-      const old=sun.replay[Math.floor(world.rng()*sun.replay.length)];
-      trainNeural(sun.neural,old.features,old.action,old.target);
-    }
+ const sun=world.sun,key=sun.lastState,vals=ensureState(sun,key),visits=sun.visits[key];
+ visits[sun.policy]+=1;
+ const alpha=Math.max(.03,1/(visits[sun.policy]+2));
+ vals[sun.policy]=clamp(vals[sun.policy]+alpha*(reward-vals[sun.policy]),-50,50);
+ if(Array.isArray(sun.lastFeatures)&&sun.lastFeatures.length===NN_INPUTS){
+  const next=neuralFeatures(world),bootstrap=Math.max(...neuralForward(sun.neural,next).output);
+  const target=Math.max(-20,Math.min(20,reward+.88*bootstrap));
+  const sample={features:sun.lastFeatures.slice(),action:sun.lastActionIndex,target};
+  sun.replay.push(sample);if(sun.replay.length>256)sun.replay.shift();
+  trainNeural(sun.neural,sample.features,sample.action,sample.target);
+  for(let i=0;i<Math.min(4,sun.replay.length);i++){
+   const old=sun.replay[Math.floor(world.rng()*sun.replay.length)];
+   trainNeural(sun.neural,old.features,old.action,old.target);
   }
-  sun.memory.push({ policy: sun.policy, state: key, reward, tick: world.tick });
-  if (sun.memory.length > 24) sun.memory.shift();
-
-  const best = bestPolicy(vals);
-  const total = SUN_POLICIES.reduce((a, p) => a + visits[p], 0);
-  if (sun.best[key] && sun.best[key] !== best && total >= 12) {
-    logEvent(world, `خورشید یاد گرفت: در «${STATE_FA[key]}» بهترین سیاست «${POLICY_FA[best]}» است.`);
-  }
-  sun.best[key] = best;
+ }
+ sun.memory.push({policy:sun.policy,state:key,reward,tick:world.tick});
+ if(sun.memory.length>24)sun.memory.shift();
+ const best=bestPolicy(vals),total=SUN_POLICIES.reduce((a,p)=>a+visits[p],0);
+ if(sun.best[key]&&sun.best[key]!==best&&total>=12)logEvent(world,`خورشید یاد گرفت: در «${STATE_FA[key]}» بهترین سیاست «${POLICY_FA[best]}» است.`);
+ sun.best[key]=best;
 }
 
 function applyPolicyEffects(world) {
@@ -724,7 +720,7 @@ export function step(world) {
   world.tick += 1;
   world.stats.totalTicks += 1;
   world.turn = { expReturned: 0, premature: 0 };
-  const healthBefore = world.healthIndex;
+  const healthBefore = world.healthIndex;\n  const objectiveBefore = ecosystemObjective(world);
 
   updateEnvironment(world);
   updateChallenge(world);
@@ -742,7 +738,7 @@ export function step(world) {
   world.healthIndex = computeHealth(world);
   if (world.healthIndex > world.stats.bestHealth) world.stats.bestHealth = world.healthIndex;
 
-  const reward = world.healthIndex - healthBefore + 0.1 * world.turn.expReturned - 0.4 * world.turn.premature;
+  const objectiveAfter = ecosystemObjective(world);\n  const reward = clamp((objectiveAfter - objectiveBefore) * 20 + (world.healthIndex - healthBefore) * 0.08 + 0.03 * world.turn.expReturned - 0.25 * world.turn.premature, -10, 10);
   sunLearn(world, reward);
   updateSunGrowth(world, reward);
 
