@@ -836,8 +836,10 @@ export function step(world, options = {}) {
 
   const objectiveAfter = ecosystemObjective(world);
   const reward = clamp((objectiveAfter - objectiveBefore) * 20 + (world.healthIndex - healthBefore) * 0.08 + 0.03 * world.turn.expReturned - 0.25 * world.turn.premature, -10, 10);
-  sunLearn(world, reward);
-  updateSunGrowth(world, reward);
+  if (options.learn !== false) {
+    sunLearn(world, reward);
+    updateSunGrowth(world, reward);
+  }
 
   world.history.push({ tick: world.tick, health: world.healthIndex, population: world.population.length, sunLevel: world.sun.level });
   if (world.history.length > 120) world.history.shift();
@@ -845,14 +847,68 @@ export function step(world, options = {}) {
 }
 
 // ---------- خروجی برای رابط کاربری ----------
-// اجرای ثابت سیاست‌ها روی بذرهای یکسان برای سنجش میانگین سلامت، جمعیت و تنوع.
+// مقایسه‌ی منصفانه: عامل تطبیقیِ در حال یادگیری در برابر خط‌پایه‌ی قاعده‌محور.
+ // هر دو روی بذرهای یکسان اجرا می‌شوند؛ خط‌پایه آموزش خورشید را غیرفعال می‌کند.
+export function benchmarkEcosystem({seeds=[101,202,303,404,505],ticks=1200,window=200}={}) {
+  const variants=["adaptiveAI","heuristicBaseline"];
+  const results={};
+  for(const variant of variants){
+    const runs=[];
+    for(const seed of seeds){
+      const w=createWorld(seed);
+      let healthSum=0,populationSum=0,richnessSum=0,aliveTicks=0;
+      let minimumPopulation=Infinity,extinctionTicks=0;
+      for(let i=0;i<ticks;i++){
+        let policyOverride;
+        if(variant==="heuristicBaseline"){
+          policyOverride=w.challenge ? (CHALLENGES[w.challenge.type]?.prior||"balance") : "balance";
+        }
+        step(w,{policyOverride,learn:variant==="adaptiveAI"});
+        if(w.population.length>0)aliveTicks++;
+        else extinctionTicks++;
+        minimumPopulation=Math.min(minimumPopulation,w.population.length);
+        if(i>=Math.max(0,ticks-window)){
+          healthSum+=w.healthIndex;
+          populationSum+=w.population.length;
+          richnessSum+=new Set(w.population.map(e=>e.species)).size;
+        }
+      }
+      const samples=Math.min(ticks,window);
+      runs.push({
+        seed,aliveRate:ticks?aliveTicks/ticks:0,extinctionTicks,
+        finalHealth:w.healthIndex,meanHealth: samples?healthSum/samples:0,
+        finalPopulation:w.population.length,meanPopulation:samples?populationSum/samples:0,
+        minimumPopulation:Number.isFinite(minimumPopulation)?minimumPopulation:0,
+        finalRichness:new Set(w.population.map(e=>e.species)).size,
+        meanRichness:samples?richnessSum/samples:0,
+        challengesFaced:w.stats.challengesFaced,
+        challengesSurvived:w.stats.challengesSurvived,
+        challengeSurvivalRate:w.stats.challengesFaced?w.stats.challengesSurvived/w.stats.challengesFaced:1,
+      });
+    }
+    const avg=key=>runs.reduce((sum,r)=>sum+r[key],0)/Math.max(1,runs.length);
+    results[variant]={
+      runs,meanAliveRate:avg("aliveRate"),meanExtinctionTicks:avg("extinctionTicks"),
+      meanHealth:avg("meanHealth"),meanPopulation:avg("meanPopulation"),
+      meanRichness:avg("meanRichness"),meanFinalRichness:avg("finalRichness"),
+      meanChallengeSurvivalRate:avg("challengeSurvivalRate"),
+    };
+  }
+  const ai=results.adaptiveAI,base=results.heuristicBaseline;
+  const deltas={};
+  for(const key of ["meanAliveRate","meanHealth","meanPopulation","meanRichness","meanFinalRichness","meanChallengeSurvivalRate"])
+    deltas[key]=ai[key]-base[key];
+  return {seeds:seeds.slice(),ticks,measurementWindow:Math.min(ticks,window),results,deltas};
+}
+
+// اجرای ثابت سیاست‌ها برای تحلیل اثر هر سیاست جداگانه.
 export function benchmarkPolicies({seeds=[101,202,303],ticks=600}={}){
  const results={};
  for(const policy of SUN_POLICIES){
   const runs=[];
   for(const seed of seeds){
    const w=createWorld(seed);
-   for(let i=0;i<ticks;i++)step(w,{policyOverride:policy});
+   for(let i=0;i<ticks;i++)step(w,{policyOverride:policy,learn:false});
    runs.push({seed,health:w.healthIndex,population:w.population.length,richness:new Set(w.population.map(e=>e.species)).size,challengesSurvived:w.stats.challengesSurvived});
   }
   const avg=key=>runs.reduce((a,r)=>a+r[key],0)/runs.length;
