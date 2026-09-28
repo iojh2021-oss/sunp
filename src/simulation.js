@@ -73,10 +73,10 @@ export const PATHS_22 = [
 export const SPECIES = {
   tree: { role: "producer", name: "درخت", lifespan: 420, matureAge: 70 },
   flower: { role: "producer", name: "گل", lifespan: 150, matureAge: 20 },
-  herbivore: { role: "consumer", diet: ["producer"], name: "گیاه‌خوار", lifespan: 200, matureAge: 30 },
-  pollinator: { role: "consumer", diet: ["producer"], name: "گرده‌افشان", lifespan: 80, matureAge: 10 },
-  aquatic: { role: "consumer", diet: ["producer"], name: "آبزی", lifespan: 180, matureAge: 25 },
-  predator: { role: "predator", diet: ["consumer"], name: "شکارچی", lifespan: 260, matureAge: 45 },
+  herbivore: { role: "consumer", diet: ["tree", "flower"], name: "گیاه‌خوار", lifespan: 200, matureAge: 30 },
+  pollinator: { role: "consumer", diet: ["flower"], name: "گرده‌افشان", lifespan: 80, matureAge: 10 },
+  aquatic: { role: "consumer", diet: ["organic", "algae"], name: "آبزی", lifespan: 180, matureAge: 25 },
+  predator: { role: "predator", diet: ["herbivore", "pollinator", "aquatic"], name: "شکارچی", lifespan: 260, matureAge: 45 },
   fungus: { role: "decomposer", name: "قارچ", lifespan: 110, matureAge: 15 },
 };
 export const LIFE_STAGES = ["seed", "sprout", "immature", "mature", "fruiting", "aging", "returning"];
@@ -550,33 +550,57 @@ function growProducers(world) {
   }
 }
 
+// منابع خوراکی مشخص‌اند؛ مصرف‌کننده‌ها برای منبع مشترک رقابت می‌کنند.
 function feedConsumers(world) {
   const env = world.env;
-  const hasProducers = world.population.some((e) => e.role === "producer" && e.stage !== "returning");
-  for (const e of world.population) {
-    if (e.role !== "consumer") continue;
-    if (hasProducers && env.biomass > 5) {
-      env.biomass = clamp(env.biomass - 0.4);
-      e.energy = clamp(e.energy + 2.6);
-      e.health = clamp(e.health + 0.4);
-    } else {
-      e.energy = clamp(e.energy - 1.6);
+  const consumers = world.population.filter(e => e.role === "consumer" && e.stage !== "returning");
+  for (const e of consumers) {
+    const diet = SPECIES[e.species].diet || [];
+    let intake = 0;
+    if (diet.includes("tree") || diet.includes("flower")) {
+      const edible = world.population.filter(p => diet.includes(p.species) && p.role === "producer" && p.stage !== "returning" && p.biomass > 0.5);
+      if (edible.length) {
+        const target = edible[Math.floor(world.rng() * edible.length)];
+        const amount = Math.min(target.biomass, e.species === "pollinator" ? 0.12 : 0.32);
+        target.biomass = Math.max(0, target.biomass - amount);
+        intake += amount * (e.species === "pollinator" ? 13 : 8);
+        if (e.species === "pollinator") target.health = clamp(target.health + 0.12);
+      }
     }
+    if (diet.includes("organic") || diet.includes("algae")) {
+      const amount = Math.min(env.organic, e.species === "aquatic" ? 0.55 : 0.25);
+      env.organic = Math.max(0, env.organic - amount);
+      intake += amount * 3;
+      if (e.species === "aquatic" && env.oxygen < 25) e.health = clamp(e.health - 0.8);
+    }
+    // محدودیت ظرفیت زیستی و رقابت: با افزایش جمعیت، سهم هر فرد کمتر می‌شود.
+    const crowding = Math.max(0, consumers.length / Math.max(1, world.populationCap * 0.42) - 0.55);
+    const need = e.species === "pollinator" ? 1.1 : e.species === "aquatic" ? 1.6 : 2.0;
+    const net = intake * (1 - Math.min(0.75, crowding * 0.18)) - need;
+    e.energy = clamp(e.energy + net);
+    e.health = clamp(e.health + (net > 0 ? 0.22 : -0.65));
+    if (net < -0.5) e.stress = (e.stress || 0) + 1;
+    else e.stress = Math.max(0, (e.stress || 0) - 1);
   }
 }
 
 function predatorPressure(world) {
-  const prey = world.population.filter((e) => e.role === "consumer" && e.stage !== "returning");
-  for (const e of world.population) {
-    if (e.role !== "predator") continue;
-    if (prey.length > 2) {
-      e.energy = clamp(e.energy + 3);
-      e.health = clamp(e.health + 0.5);
-      const victim = prey[Math.floor(world.rng() * prey.length)];
-      if (victim) victim.health = clamp(victim.health - 6 * (1 - 0.5 * victim.resilience));
-    } else {
-      e.energy = clamp(e.energy - 2);
+  const predators = world.population.filter(e => e.role === "predator" && e.stage !== "returning");
+  for (const hunter of predators) {
+    const diet = SPECIES[hunter.species].diet || [];
+    const prey = world.population.filter(e => diet.includes(e.species) && e.stage !== "returning" && e.health > 0);
+    if (!prey.length) {
+      hunter.energy = clamp(hunter.energy - 2.2);
+      hunter.health = clamp(hunter.health - 0.35);
+      continue;
     }
+    const victim = prey[Math.floor(world.rng() * prey.length)];
+    const damage = 5.5 * (1 - 0.55 * victim.resilience);
+    victim.health = clamp(victim.health - damage);
+    hunter.energy = clamp(hunter.energy + damage * 0.55);
+    hunter.health = clamp(hunter.health + 0.25);
+    // شکار زیست‌توده را به سطح بالاتر شبکه غذایی منتقل می‌کند.
+    hunter.biomass = clamp(hunter.biomass + damage * 0.04);
   }
 }
 
@@ -607,13 +631,13 @@ function ageAndProgress(world) {
 
 function handleReproduction(world) {
   world.recentBirths *= 0.6;
-  if (world.population.length >= world.populationCap) return;
+  if (world.population.length >= world.populationCap) return;\n  const producers = world.population.filter(e => e.role === "producer").length;\n  const consumers = world.population.filter(e => e.role === "consumer" || e.role === "predator").length;\n  const producerCapacity = Math.max(2, Math.floor(world.populationCap * 0.48 * (0.35 + world.env.water / 150 + world.env.soil / 180)));\n  const consumerCapacity = Math.max(1, Math.floor(world.populationCap * 0.38 * (0.25 + world.env.biomass / 130 + world.env.oxygen / 220)));
   const counts = {};
   for (const e of world.population) counts[e.species] = (counts[e.species] || 0) + 1;
   const diversityBoost = world.sun.policy === "diversity";
   const born = [];
   for (const e of world.population) {
-    if (e.stage !== "mature" && e.stage !== "fruiting") continue;
+    if (e.stage !== "mature" && e.stage !== "fruiting") continue;\n    if (e.role === "producer" && producers + born.length >= producerCapacity) continue;\n    if ((e.role === "consumer" || e.role === "predator") && consumers + born.length >= consumerCapacity) continue;
     if (e.health < 55 || e.energy < 45) continue;
     const rarity = diversityBoost ? 1 / (1 + (counts[e.species] || 1)) : 0.15;
     const chance = (0.02 + rarity * 0.06) * (e.stage === "fruiting" ? 1.5 : 1);
