@@ -938,7 +938,9 @@ export function benchmarkPolicies({seeds=[101,202,303],ticks=600}={}){
  return {seeds:seeds.slice(),ticks,results};
 }
 
-export function getSunObservation(world) { return neuralFeatures(world); }\n\nexport function getTreeOfLifeState(world) {
+export function getSunObservation(world) { return neuralFeatures(world); }
+
+export function getTreeOfLifeState(world) {
   return SEPHIROT.map((n) => ({ ...n, lit: n.level <= world.sun.level }));
 }
 export function getCurrentZodiac(world) {
