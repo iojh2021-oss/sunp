@@ -1,0 +1,32 @@
+name: Train Sun PPO policy
+on:
+  workflow_dispatch:
+    inputs:
+      frames:
+        description: "PPO training frames"
+        required: true
+        default: "50000"
+permissions:
+  contents: write
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: npm test
+      - run: pip install -r training/requirements.txt
+      - run: python training/train_ppo.py --frames "${{ inputs.frames }}"
+      - name: Commit trained policy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/models/
+          git diff --cached --quiet || (git commit -m "Add trained Sun PPO policy" && git push)
