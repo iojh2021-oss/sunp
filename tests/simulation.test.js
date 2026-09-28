@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import {
   createWorld, step, ZODIAC, SEPHIROT, PATHS_22, getTreeOfLifeState, getCurrentZodiac,
-  exportMemory, sanitizeMemory, getLessons, getSunBonus, benchmarkPolicies,
+  exportMemory, sanitizeMemory, getLessons, getSunBonus, benchmarkPolicies, getSunDecisionReport,
 } from "../src/simulation.js";
 
 const runN = (w, n) => { for (let i = 0; i < n; i++) step(w); return w; };
@@ -162,4 +162,19 @@ test("برنامه‌ریزی و حافظه تجربه: خروجی‌ها متن
     assert.ok(Number.isFinite(report.results[policy].meanRichness));
     assert.equal(report.results[policy].runs.length,2);
   }
+});
+
+test("گزارش تصمیم خورشید همه سیاست‌ها و امتیازهای محدود را نشان می‌دهد", () => {
+  const w = runN(createWorld(404), 90);
+  const before = JSON.stringify({env:w.env,population:w.population,tick:w.tick,sun:w.sun});
+  const report = getSunDecisionReport(w);
+  assert.equal(report.policies.length, 4);
+  assert.ok(["repair","conserve","balance","diversity"].includes(report.selected));
+  for (const row of report.policies) {
+    for (const key of ["score","rollout","learned","tabular","recalled","confidence","exploration"]) {
+      assert.ok(Number.isFinite(row[key]), key);
+    }
+    assert.ok(row.confidence >= 0 && row.confidence <= 1);
+  }
+  assert.equal(JSON.stringify({env:w.env,population:w.population,tick:w.tick,sun:w.sun}), before);
 });
