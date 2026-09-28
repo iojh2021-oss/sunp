@@ -627,13 +627,19 @@ function ageAndProgress(world) {
 
 function handleReproduction(world) {
   world.recentBirths *= 0.6;
-  if (world.population.length >= world.populationCap) return;\n  const producers = world.population.filter(e => e.role === "producer").length;\n  const consumers = world.population.filter(e => e.role === "consumer" || e.role === "predator").length;\n  const producerCapacity = Math.max(2, Math.floor(world.populationCap * 0.48 * (0.35 + world.env.water / 150 + world.env.soil / 180)));\n  const consumerCapacity = Math.max(1, Math.floor(world.populationCap * 0.38 * (0.25 + world.env.biomass / 130 + world.env.oxygen / 220)));
+  if (world.population.length >= world.populationCap) return;
+  const producers = world.population.filter(e => e.role === "producer").length;
+  const consumers = world.population.filter(e => e.role === "consumer" || e.role === "predator").length;
+  const producerCapacity = Math.max(2, Math.floor(world.populationCap * 0.48 * (0.35 + world.env.water / 150 + world.env.soil / 180)));
+  const consumerCapacity = Math.max(1, Math.floor(world.populationCap * 0.38 * (0.25 + world.env.biomass / 130 + world.env.oxygen / 220)));
   const counts = {};
   for (const e of world.population) counts[e.species] = (counts[e.species] || 0) + 1;
   const diversityBoost = world.sun.policy === "diversity";
   const born = [];
   for (const e of world.population) {
-    if (e.stage !== "mature" && e.stage !== "fruiting") continue;\n    if (e.role === "producer" && producers + born.length >= producerCapacity) continue;\n    if ((e.role === "consumer" || e.role === "predator") && consumers + born.length >= consumerCapacity) continue;
+    if (e.stage !== "mature" && e.stage !== "fruiting") continue;
+    if (e.role === "producer" && producers + born.length >= producerCapacity) continue;
+    if ((e.role === "consumer" || e.role === "predator") && consumers + born.length >= consumerCapacity) continue;
     if (e.health < 55 || e.energy < 45) continue;
     const rarity = diversityBoost ? 1 / (1 + (counts[e.species] || 1)) : 0.15;
     const chance = (0.02 + rarity * 0.06) * (e.stage === "fruiting" ? 1.5 : 1);
@@ -720,7 +726,8 @@ export function step(world) {
   world.tick += 1;
   world.stats.totalTicks += 1;
   world.turn = { expReturned: 0, premature: 0 };
-  const healthBefore = world.healthIndex;\n  const objectiveBefore = ecosystemObjective(world);
+  const healthBefore = world.healthIndex;
+  const objectiveBefore = ecosystemObjective(world);
 
   updateEnvironment(world);
   updateChallenge(world);
@@ -738,7 +745,8 @@ export function step(world) {
   world.healthIndex = computeHealth(world);
   if (world.healthIndex > world.stats.bestHealth) world.stats.bestHealth = world.healthIndex;
 
-  const objectiveAfter = ecosystemObjective(world);\n  const reward = clamp((objectiveAfter - objectiveBefore) * 20 + (world.healthIndex - healthBefore) * 0.08 + 0.03 * world.turn.expReturned - 0.25 * world.turn.premature, -10, 10);
+  const objectiveAfter = ecosystemObjective(world);
+  const reward = clamp((objectiveAfter - objectiveBefore) * 20 + (world.healthIndex - healthBefore) * 0.08 + 0.03 * world.turn.expReturned - 0.25 * world.turn.premature, -10, 10);
   sunLearn(world, reward);
   updateSunGrowth(world, reward);
 
