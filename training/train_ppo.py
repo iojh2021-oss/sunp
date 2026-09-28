@@ -71,7 +71,8 @@ def train(args):
         returns=adv+val
         batch={"obs":torch.stack(observations),"action":torch.stack(actions),"old_logp":torch.stack(logps),"adv":adv,"returns":returns}
         rollout_td=TensorDict(batch,batch_size=[n])
-        replay=ReplayBuffer(storage=LazyTensorStorage(max_size=args.rollout))\n        replay.extend(rollout_td)
+        replay=ReplayBuffer(storage=LazyTensorStorage(max_size=args.rollout))
+        replay.extend(rollout_td)
         adv=(adv-adv.mean())/(adv.std(unbiased=False)+1e-8)
         n=len(adv)
         for _ in range(args.epochs):
