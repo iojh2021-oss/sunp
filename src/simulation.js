@@ -176,6 +176,7 @@ function bestPolicy(vals) {
 }
 
 const NN_INPUTS=16, NN_OUTPUTS=SUN_POLICIES.length;
+const PLAN_HORIZON=4;
 const NN_SHAPE=[NN_INPUTS,24,16,12,NN_OUTPUTS];
 function freshNetwork(){
  const layers=[];
@@ -289,7 +290,7 @@ export function sanitizeMemory(raw) {
       wisdomCycles: Math.floor(num(s.wisdomCycles, 0, 0, 1e6)),
       experienceTotal: num(s.experienceTotal, 0, 0, 1e9),
       neural,
-      memory: Array.isArray(s.replay ?? s.memory) ? (s.replay ?? s.memory).slice(-256).filter(m => m && Array.isArray(m.features) && m.features.length === NN_INPUTS && Number.isInteger(m.action) && m.action >= 0 && m.action < NN_OUTPUTS).map(m => ({ features: m.features.map(v => num(v, 0, -1, 1)), action: m.action, target: num(m.target, 0, -20, 20) })) : [],
+      memory: Array.isArray(s.replay ?? s.memory) ? (s.replay ?? s.memory).slice(-256).filter(m => m && Array.isArray(m.features) && m.features.length === NN_INPUTS && Number.isInteger(m.action) && m.action >= 0 && m.action < NN_OUTPUTS).map(m => ({ features: m.features.map(v => num(v, 0, -1, 1)), action: m.action, target: num(m.target, 0, -20, 20), priority:num(m.priority,.1,.01,8) })) : [],
       pillarCharge: {
         mercy: num(pc.mercy, 10, 0, 100),
         severity: num(pc.severity, 10, 0, 100),
@@ -461,13 +462,50 @@ function weakestPillar(sun) {
   return Object.entries(sun.pillarCharge).sort((a, b) => a[1] - b[1])[0][0];
 }
 
-function sunDecidePolicy(world) {
+function stateSimilarity(a,b){
+ let d=0;for(let i=0;i<Math.min(a.length,b.length);i++){const z=a[i]-b[i];d+=z*z;}
+ return Math.exp(-3*d/Math.max(1,Math.min(a.length,b.length)));
+}
+// مدل پیش‌بینی تقریبی؛ فقط روی کپی منابع و ویژگی‌های جمعیت کار می‌کند.
+function predictPolicyOutcome(world, policy, horizon=PLAN_HORIZON){
+ const env={...world.env},pop=world.population.map(e=>({health:e.health,energy:e.energy,role:e.role,species:e.species,resilience:e.resilience}));
+ const c=world.challenge;
+ let score=0;
+ for(let t=0;t<horizon;t++){
+  if(policy==="repair"){env.biomass=clamp(env.biomass+3.2);env.soil=clamp(env.soil+1.5);env.nutrients=clamp(env.nutrients-1.2);}
+  else if(policy==="conserve"){env.water=clamp(env.water+2.4);env.soil=clamp(env.soil+1.2);env.light=clamp(env.light-1.5);}
+  else if(policy==="balance"){env.oxygen=clamp(env.oxygen+1.2);env.biomass=clamp(env.biomass+1);}
+  else {env.nutrients=clamp(env.nutrients+3);env.oxygen=clamp(env.oxygen+.8);}
+  if(c)for(const e of pop){const stress=c.type==="drought"?env.water<25: c.type==="cold"?env.temp<10:c.type==="blight"?env.nutrients<25:env.oxygen<25;e.health=clamp(e.health-c.severity*(stress?1.2:.55)*(e.role==="producer"?1.1:.7)*(1-.7*e.resilience));}
+  const resource=(env.water+env.soil+env.nutrients+env.oxygen+env.biomass)/500;
+  const health=pop.length?pop.reduce((a,e)=>a+e.health,0)/(pop.length*100):0;
+  const richness=new Set(world.population.map(e=>e.species)).size/Object.keys(SPECIES).length;
+  score+=.45*health+.3*resource+.25*richness;
+  for(const e of pop)e.health=clamp(e.health-(e.energy<35?.45:.12));
+ }
+ return score/horizon;
+}
+function planPolicy(world,features){
+ const memory=world.sun.replay||[];
+ return SUN_POLICIES.map((policy,action)=>{
+  let rollout=0;for(let h=1;h<=PLAN_HORIZON;h++)rollout+=predictPolicyOutcome(world,policy,h)/h;
+  rollout/=PLAN_HORIZON;
+  let similar=0,weight=0;
+  for(const m of memory){if(m.action!==action)continue;const sim=stateSimilarity(features,m.features);similar+=sim*m.target;weight+=sim;}
+  const recalled=weight?similar/weight:0;
+  const learned=neuralForward(world.sun.neural,features).output[action];
+  return .48*rollout+.32*learned+.20*recalled;
+ });
+}
+function sunDecidePolicy(world, policyOverride=null) {
   const sun=world.sun,key=world.challenge?world.challenge.type:"calm";
   const vals=ensureState(sun,key),eps=Math.max(.025,.2-.012*sun.level-.01*sun.wisdomCycles);
   const features=neuralFeatures(world),prediction=neuralForward(sun.neural,features).output;
-  const qValues=SUN_POLICIES.map((p,i)=>.35*vals[p]+.65*prediction[i]);
+  const planned=planPolicy(world,features);
+  const qValues=SUN_POLICIES.map((p,i)=>.25*vals[p]+.45*prediction[i]+.30*planned[i]);
   let action=0;
-  if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);
+  if(policyOverride && SUN_POLICIES.includes(policyOverride))action=SUN_POLICIES.indexOf(policyOverride);
+  else if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);
   else {let best=-Infinity;for(let i=0;i<qValues.length;i++)if(qValues[i]>best){best=qValues[i];action=i}}
   sun.lastFeatures=features;sun.lastActionIndex=action;sun.lastState=key;sun.policy=SUN_POLICIES[action];
   const pillar=sun.policy==="repair"?"mercy":sun.policy==="conserve"?"severity":sun.policy==="balance"?"balance":weakestPillar(sun);
@@ -496,12 +534,15 @@ function sunLearn(world, reward) {
  if(Array.isArray(sun.lastFeatures)&&sun.lastFeatures.length===NN_INPUTS){
   const next=neuralFeatures(world),bootstrap=Math.max(...neuralForward(sun.neural,next).output);
   const target=Math.max(-20,Math.min(20,reward+.88*bootstrap));
-  const sample={features:sun.lastFeatures.slice(),action:sun.lastActionIndex,target};
+  const sample={features:sun.lastFeatures.slice(),action:sun.lastActionIndex,target,priority:Math.abs(target-neuralForward(sun.neural,sun.lastFeatures).output[sun.lastActionIndex])};
   sun.replay.push(sample);if(sun.replay.length>256)sun.replay.shift();
   trainNeural(sun.neural,sample.features,sample.action,sample.target);
   for(let i=0;i<Math.min(4,sun.replay.length);i++){
-   const old=sun.replay[Math.floor(world.rng()*sun.replay.length)];
-   trainNeural(sun.neural,old.features,old.action,old.target);
+   const weights=sun.replay.map(m=>Math.max(.05,Math.min(8,m.priority||.1)));
+   const total=weights.reduce((a,v)=>a+v,0);let pick=world.rng()*total,index=0;
+   for(;index<weights.length-1&&pick>weights[index];index++)pick-=weights[index];
+   const old=sun.replay[index];trainNeural(sun.neural,old.features,old.action,old.target);
+   old.priority=Math.abs(old.target-neuralForward(sun.neural,old.features).output[old.action]);
   }
  }
  sun.memory.push({policy:sun.policy,state:key,reward,tick:world.tick});
@@ -743,7 +784,7 @@ function updateSunGrowth(world, reward) {
   }
 }
 
-export function step(world) {
+export function step(world, options = {}) {
   world.tick += 1;
   world.stats.totalTicks += 1;
   world.turn = { expReturned: 0, premature: 0 };
@@ -752,7 +793,7 @@ export function step(world) {
 
   updateEnvironment(world);
   updateChallenge(world);
-  sunDecidePolicy(world);
+  sunDecidePolicy(world, options.policyOverride || null);
   applyPolicyEffects(world);
   emitLightAndSeeds(world);
   growProducers(world);
@@ -777,6 +818,22 @@ export function step(world) {
 }
 
 // ---------- خروجی برای رابط کاربری ----------
+// اجرای ثابت سیاست‌ها روی بذرهای یکسان برای سنجش میانگین سلامت، جمعیت و تنوع.
+export function benchmarkPolicies({seeds=[101,202,303],ticks=600}={}){
+ const results={};
+ for(const policy of SUN_POLICIES){
+  const runs=[];
+  for(const seed of seeds){
+   const w=createWorld(seed);
+   for(let i=0;i<ticks;i++)step(w,{policyOverride:policy});
+   runs.push({seed,health:w.healthIndex,population:w.population.length,richness:new Set(w.population.map(e=>e.species)).size,challengesSurvived:w.stats.challengesSurvived});
+  }
+  const avg=key=>runs.reduce((a,r)=>a+r[key],0)/runs.length;
+  results[policy]={runs,meanHealth:avg("health"),meanPopulation:avg("population"),meanRichness:avg("richness"),meanChallengesSurvived:avg("challengesSurvived")};
+ }
+ return {seeds:seeds.slice(),ticks,results};
+}
+
 export function getTreeOfLifeState(world) {
   return SEPHIROT.map((n) => ({ ...n, lit: n.level <= world.sun.level }));
 }
