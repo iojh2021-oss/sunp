@@ -245,6 +245,14 @@ function bindControls() {
 }
 
 async function init() {
+  try {
+    const response = await fetch("./models/sun-ppo.json", { cache: "no-store" });
+    if (response.ok) {
+      const model = await response.json();
+      if (loadSunRLPolicy(model)) console.info("Sun PPO policy loaded");
+      else console.warn("Sun PPO model rejected: incompatible format");
+    }
+  } catch (error) { console.info("No trained Sun PPO policy available; using built-in learner.", error); }
   const memory = await loadMemory();
   const epoch = memory && memory.stats && Number.isFinite(memory.stats.epochs) ? memory.stats.epochs : 0;
   world = createWorld(BASE_SEED + epoch * 7919, memory);
