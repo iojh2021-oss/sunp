@@ -175,7 +175,7 @@ function bestPolicy(vals) {
   return best;
 }
 
-const NN_INPUTS=15, NN_OUTPUTS=SUN_POLICIES.length;
+const NN_INPUTS=16, NN_OUTPUTS=SUN_POLICIES.length;
 const NN_SHAPE=[NN_INPUTS,24,16,12,NN_OUTPUTS];
 function freshNetwork(){
  const layers=[];
