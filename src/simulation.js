@@ -857,6 +857,7 @@ export function step(world, options = {}) {
 
   const objectiveAfter = ecosystemObjective(world);
   const reward = clamp((objectiveAfter - objectiveBefore) * 20 + (world.healthIndex - healthBefore) * 0.08 + 0.03 * world.turn.expReturned - 0.25 * world.turn.premature, -10, 10);
+  world.lastReward = reward;
   if (options.learn !== false) {
     sunLearn(world, reward);
     updateSunGrowth(world, reward);
