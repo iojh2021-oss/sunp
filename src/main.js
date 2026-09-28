@@ -1,6 +1,6 @@
 // src/main.js — داشبورد و کنترل‌ها + حافظه‌ی ماندگار خورشید (سرور در صورت وجود، وگرنه مرورگر).
 import {
-  createWorld, step, exportMemory, getLessons, getTreeOfLifeState, getCurrentZodiac, summarizeEntity,
+  createWorld, step, exportMemory, getLessons, getTreeOfLifeState, getCurrentZodiac, summarizeEntity, loadSunRLPolicy,
   PATHS_22, PILLARS, POLICY_FA, STAGE_FA, SPECIES, CHALLENGES,
 } from "./simulation.js";
 import { initScene, renderScene, hitTestEntity, speciesLabel } from "./scene.js";
