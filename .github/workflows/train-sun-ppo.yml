@@ -1,5 +1,10 @@
 name: Train Sun PPO policy
 on:
+  push:
+    paths:
+      - 'src/simulation.js'
+      - 'training/**'
+      - '.github/workflows/train-sun-ppo.yml'
   workflow_dispatch:
     inputs:
       frames:
