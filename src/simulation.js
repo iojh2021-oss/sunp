@@ -268,7 +268,7 @@ export function sanitizeMemory(raw) {
       wisdomCycles: Math.floor(num(s.wisdomCycles, 0, 0, 1e6)),
       experienceTotal: num(s.experienceTotal, 0, 0, 1e9),
       neural,
-      memory: Array.isArray(s.memory) ? s.memory.slice(-256).filter(m => m && Array.isArray(m.features) && m.features.length === NN_INPUTS && Number.isInteger(m.action) && m.action >= 0 && m.action < NN_OUTPUTS).map(m => ({ features: m.features.map(v => num(v, 0, -1, 1)), action: m.action, target: num(m.target, 0, -20, 20) })) : [],
+      memory: Array.isArray(s.replay) ? s.replay.slice(-256).filter(m => m && Array.isArray(m.features) && m.features.length === NN_INPUTS && Number.isInteger(m.action) && m.action >= 0 && m.action < NN_OUTPUTS).map(m => ({ features: m.features.map(v => num(v, 0, -1, 1)), action: m.action, target: num(m.target, 0, -20, 20) })) : [],
       pillarCharge: {
         mercy: num(pc.mercy, 10, 0, 100),
         severity: num(pc.severity, 10, 0, 100),
