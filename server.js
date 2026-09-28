@@ -58,7 +58,7 @@ const MIME = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
 };
-const STATIC_ALLOW = /^\/(?:|index\.html|style\.css|src\/[a-zA-Z0-9_-]+\.js)$/;
+const STATIC_ALLOW = /^\/(?:|index\.html|style\.css|src\/[a-zA-Z0-9_-]+\.js|public\/models\/[a-zA-Z0-9_-]+\.json)$/;
 
 function send(res, code, body, type = "application/json; charset=utf-8", extra = {}) {
   res.writeHead(code, { "content-type": type, "cache-control": "no-store", "x-content-type-options": "nosniff", ...extra });

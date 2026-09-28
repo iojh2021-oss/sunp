@@ -246,7 +246,7 @@ function bindControls() {
 
 async function init() {
   try {
-    const response = await fetch("./models/sun-ppo.json", { cache: "no-store" });
+    const response = await fetch("./public/models/sun-ppo.json", { cache: "no-store" });
     if (response.ok) {
       const model = await response.json();
       if (loadSunRLPolicy(model)) console.info("Sun PPO policy loaded");
