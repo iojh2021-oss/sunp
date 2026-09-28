@@ -551,10 +551,15 @@ function sunDecidePolicy(world, policyOverride=null) {
   const features=neuralFeatures(world);
   const evaluations=evaluatePolicies(world,features,vals,sun.visits[key]);
   const qValues=evaluations.map(x=>x.decisionScore);
+  const trainedLogits=trainedPolicyLogits(features);
   let action=0;
   if(policyOverride && SUN_POLICIES.includes(policyOverride))action=SUN_POLICIES.indexOf(policyOverride);
   else if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);
-  else {let best=-Infinity;for(let i=0;i<qValues.length;i++)if(qValues[i]>best){best=qValues[i];action=i}}
+  else {
+    const scores=trainedLogits ?? qValues;
+    let best=-Infinity;
+    for(let i=0;i<scores.length;i++)if(scores[i]>best){best=scores[i];action=i}
+  }
   sun.lastFeatures=features;sun.lastActionIndex=action;sun.lastState=key;sun.policy=SUN_POLICIES[action];
   const pillar=sun.policy==="repair"?"mercy":sun.policy==="conserve"?"severity":sun.policy==="balance"?"balance":weakestPillar(sun);
   sun.pillarCharge[pillar]=clamp(sun.pillarCharge[pillar]+9);
