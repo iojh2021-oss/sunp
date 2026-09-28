@@ -13,6 +13,8 @@ const ICONS = {
   predator: "🐺",
   fungus: "🍄",
 };
+const hitboxesByWorld = new WeakMap();
+
 const STAGE_SIZE = { seed: 11, sprout: 14, immature: 18, mature: 26, fruiting: 28, aging: 22, returning: 16 };
 
 const TINT = {
@@ -134,7 +136,8 @@ export function renderScene(canvas, ctx, world, time = 0) {
   }
 
   // موجودات
-  world._hitboxes = [];
+  const hitboxes = [];
+  hitboxesByWorld.set(world, hitboxes);
   const bandTop = sunY + sunR + 44;
   const bandBottom = islandCY - 4;
   const sorted = [...world.population].sort((a, b) => a.pos.a - b.pos.a);
@@ -154,7 +157,7 @@ export function renderScene(canvas, ctx, world, time = 0) {
       ctx.arc(x, y, size * 0.7 + 3, 0, Math.PI * 2);
       ctx.stroke();
     }
-    world._hitboxes.push({ id: e.id, x, y, r: size * 0.7 + 4 });
+    hitboxes.push({ id: e.id, x, y, r: size * 0.7 + 4 });
   }
 
   // رنگ‌آمیزی چالش فعال
@@ -170,9 +173,10 @@ export function renderScene(canvas, ctx, world, time = 0) {
 }
 
 export function hitTestEntity(world, x, y) {
-  if (!world._hitboxes) return null;
-  for (let i = world._hitboxes.length - 1; i >= 0; i--) {
-    const b = world._hitboxes[i];
+  const hitboxes = hitboxesByWorld.get(world);
+  if (!hitboxes) return null;
+  for (let i = hitboxes.length - 1; i >= 0; i--) {
+    const b = hitboxes[i];
     if (Math.hypot(b.x - x, b.y - y) <= b.r) return b.id;
   }
   return null;
