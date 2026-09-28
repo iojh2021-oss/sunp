@@ -175,6 +175,36 @@ function bestPolicy(vals) {
   return best;
 }
 
+const NN_INPUTS=11, NN_HIDDEN=8, NN_OUTPUTS=SUN_POLICIES.length;
+function freshNetwork(){
+ return {
+  w1:Array.from({length:NN_HIDDEN},(_,h)=>Array.from({length:NN_INPUTS},(_,i)=>Math.sin((h+1)*(i+3))*.08)),
+  b1:Array(NN_HIDDEN).fill(0),
+  w2:Array.from({length:NN_OUTPUTS},(_,o)=>Array.from({length:NN_HIDDEN},(_,h)=>Math.cos((o+2)*(h+1))*.08)),
+  b2:Array(NN_OUTPUTS).fill(0),updates:0
+ };
+}
+function neuralFeatures(world){
+ const e=world.env,c=world.challenge;
+ return [e.light/100,e.temp/60,e.water/100,e.soil/100,e.nutrients/100,e.oxygen/100,e.biomass/100,world.healthIndex/100,c?1:0,c?c.severity:0,world.sun.level/10]
+ .map(v=>Math.max(-1,Math.min(1,v*2-1)));
+}
+function neuralForward(net,x){
+ const hidden=net.b1.map((b,h)=>Math.tanh(b+net.w1[h].reduce((s,w,i)=>s+w*x[i],0)));
+ return {hidden,output:net.b2.map((b,o)=>b+net.w2[o].reduce((s,w,h)=>s+w*hidden[h],0))};
+}
+function trainNeural(net,x,action,target){
+ const {hidden,output}=neuralForward(net,x),error=Math.max(-10,Math.min(10,target-output[action]));
+ const lr=.025/Math.sqrt(1+net.updates/500),old=net.w2[action].slice();
+ net.b2[action]=Math.max(-20,Math.min(20,net.b2[action]+lr*error));
+ for(let h=0;h<NN_HIDDEN;h++)net.w2[action][h]=Math.max(-5,Math.min(5,net.w2[action][h]+lr*error*hidden[h]));
+ for(let h=0;h<NN_HIDDEN;h++){
+  const grad=error*old[h]*(1-hidden[h]*hidden[h]);
+  net.b1[h]=Math.max(-5,Math.min(5,net.b1[h]+lr*grad));
+  for(let i=0;i<NN_INPUTS;i++)net.w1[h][i]=Math.max(-5,Math.min(5,net.w1[h][i]+lr*grad*x[i]));
+ }
+ net.updates++;
+}
 function defaultSun() {
   return {
     policy: "balance",
@@ -188,6 +218,9 @@ function defaultSun() {
     wisdomCycles: 0,
     experienceTotal: 0,
     pillarCharge: { mercy: 10, severity: 10, balance: 10 },
+    neural: freshNetwork(),
+    lastFeatures: null,
+    lastActionIndex: 0,
   };
 }
 
@@ -215,6 +248,14 @@ export function sanitizeMemory(raw) {
     }
   }
   const pc = s.pillarCharge || {};
+  const rawNet=s.neural||{},fallback=freshNetwork();
+  const neural={
+    w1:Array.from({length:NN_HIDDEN},(_,h)=>Array.from({length:NN_INPUTS},(_,i)=>num(rawNet.w1?.[h]?.[i],fallback.w1[h][i],-5,5))),
+    b1:Array.from({length:NN_HIDDEN},(_,h)=>num(rawNet.b1?.[h],0,-5,5)),
+    w2:Array.from({length:NN_OUTPUTS},(_,o)=>Array.from({length:NN_HIDDEN},(_,h)=>num(rawNet.w2?.[o]?.[h],fallback.w2[o][h],-5,5))),
+    b2:Array.from({length:NN_OUTPUTS},(_,o)=>num(rawNet.b2?.[o],0,-20,20)),
+    updates:Math.floor(num(rawNet.updates,0,0,1e9)),
+  };
   const st = raw.stats || {};
   return {
     version: MEMORY_VERSION,
@@ -225,6 +266,7 @@ export function sanitizeMemory(raw) {
       level: Math.floor(num(s.level, 1, 1, 10)),
       wisdomCycles: Math.floor(num(s.wisdomCycles, 0, 0, 1e6)),
       experienceTotal: num(s.experienceTotal, 0, 0, 1e9),
+      neural,
       pillarCharge: {
         mercy: num(pc.mercy, 10, 0, 100),
         severity: num(pc.severity, 10, 0, 100),
@@ -259,6 +301,7 @@ function applyMemory(world, mem) {
   sun.wisdomCycles = clean.sun.wisdomCycles;
   sun.experienceTotal = clean.sun.experienceTotal;
   sun.pillarCharge = clean.sun.pillarCharge;
+  sun.neural = clean.sun.neural;
   for (const key of Object.keys(sun.values)) sun.best[key] = bestPolicy(sun.values[key]);
   world.stats = { ...clean.stats, epochs: clean.stats.epochs + 1 };
   return true;
@@ -398,14 +441,15 @@ function sunDecidePolicy(world) {
   const sun = world.sun;
   const key = world.challenge ? world.challenge.type : "calm";
   const vals = ensureState(sun, key);
-  const eps = Math.max(0.03, 0.18 - 0.012 * sun.level - 0.01 * sun.wisdomCycles);
-  let policy;
-  if (world.env.biomass < 15) policy = "repair";
-  else if (world.env.water < 12 || world.env.soil < 12) policy = "conserve";
-  else if (world.rng() < eps) policy = SUN_POLICIES[Math.floor(world.rng() * SUN_POLICIES.length)];
-  else policy = bestPolicy(vals);
-  sun.lastState = key;
-  sun.policy = policy;
+  const eps=Math.max(.025,.2-.012*sun.level-.01*sun.wisdomCycles);
+  const features=neuralFeatures(world),prediction=neuralForward(sun.neural,features).output;
+  const qValues=SUN_POLICIES.map((p,i)=>.35*vals[p]+.65*prediction[i]);
+  let action=0;
+  if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);
+  else {let best=-Infinity;for(let i=0;i<qValues.length;i++)if(qValues[i]>best){best=qValues[i];action=i}}
+  const policy=SUN_POLICIES[action];
+  sun.lastFeatures=features;sun.lastActionIndex=action;
+  sun.lastState=key;sun.policy=policy;
 
   const pillar = policy === "repair" ? "mercy" : policy === "conserve" ? "severity" : policy === "balance" ? "balance" : weakestPillar(sun);
   sun.pillarCharge[pillar] = clamp(sun.pillarCharge[pillar] + 9);
@@ -421,6 +465,10 @@ function sunLearn(world, reward) {
   visits[sun.policy] += 1;
   const alpha = Math.max(0.03, 1 / (visits[sun.policy] + 2));
   vals[sun.policy] = clamp(vals[sun.policy] + alpha * (reward - vals[sun.policy]), -50, 50);
+  if(Array.isArray(sun.lastFeatures)&&sun.lastFeatures.length===NN_INPUTS){
+    const bootstrap=Math.max(...neuralForward(sun.neural,neuralFeatures(world)).output);
+    trainNeural(sun.neural,sun.lastFeatures,sun.lastActionIndex,Math.max(-20,Math.min(20,reward+.88*bootstrap)));
+  }
   sun.memory.push({ policy: sun.policy, state: key, reward, tick: world.tick });
   if (sun.memory.length > 24) sun.memory.shift();
 
