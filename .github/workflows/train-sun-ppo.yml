@@ -28,7 +28,7 @@ jobs:
           cache: pip
       - run: npm test
       - run: pip install -r training/requirements.txt
-      - run: python training/train_ppo.py --frames "${{ inputs.frames }}"
+      - run: python training/train_ppo.py --frames "${{ inputs.frames || '50000' }}"
       - name: Commit trained policy
         run: |
           git config user.name "github-actions[bot]"
