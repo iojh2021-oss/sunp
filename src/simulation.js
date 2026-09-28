@@ -177,6 +177,27 @@ function bestPolicy(vals) {
 
 const NN_INPUTS=16, NN_OUTPUTS=SUN_POLICIES.length;
 const PLAN_HORIZON=4;
+let trainedRLPolicy = null;
+export function loadSunRLPolicy(model) {
+  if (!model || model.version !== 1 || model.inputSize !== NN_INPUTS || model.actions !== NN_OUTPUTS || !Array.isArray(model.layers)) return false;
+  let input=NN_INPUTS;
+  for (const layer of model.layers) {
+    if (!Array.isArray(layer.weights) || !Array.isArray(layer.bias) || layer.weights.length !== layer.bias.length || layer.weights.some(row => !Array.isArray(row) || row.length !== input)) return false;
+    input=layer.bias.length;
+  }
+  if(input!==NN_OUTPUTS)return false;
+  trainedRLPolicy=model;
+  return true;
+}
+function trainedPolicyLogits(features) {
+  if(!trainedRLPolicy)return null;
+  let x=features.slice();
+  for(let l=0;l<trainedRLPolicy.layers.length;l++){
+    const layer=trainedRLPolicy.layers[l],last=l===trainedRLPolicy.layers.length-1;
+    x=layer.bias.map((b,o)=>{const z=b+layer.weights[o].reduce((sum,w,i)=>sum+w*x[i],0);return last?z:Math.tanh(z);});
+  }
+  return x;
+}
 const NN_SHAPE=[NN_INPUTS,24,16,12,NN_OUTPUTS];
 function freshNetwork(){
  const layers=[];
@@ -917,7 +938,7 @@ export function benchmarkPolicies({seeds=[101,202,303],ticks=600}={}){
  return {seeds:seeds.slice(),ticks,results};
 }
 
-export function getTreeOfLifeState(world) {
+export function getSunObservation(world) { return neuralFeatures(world); }\n\nexport function getTreeOfLifeState(world) {
   return SEPHIROT.map((n) => ({ ...n, lit: n.level <= world.sun.level }));
 }
 export function getCurrentZodiac(world) {
