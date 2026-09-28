@@ -1,83 +1,138 @@
-// src/main.js — داشبورد و کنترل‌ها: اتصال موتور مدل به رابط کاربری.
-import { createWorld, step, getTreeOfLifeState, getCurrentZodiac, summarizeEntity, PATHS_22, PILLARS, POLICY_FA, STAGE_FA, SPECIES } from "./simulation.js";
+// src/main.js — داشبورد و کنترل‌ها + حافظه‌ی ماندگار خورشید (سرور در صورت وجود، وگرنه مرورگر).
+import {
+  createWorld, step, exportMemory, getLessons, getTreeOfLifeState, getCurrentZodiac, summarizeEntity,
+  PATHS_22, PILLARS, POLICY_FA, STAGE_FA, SPECIES, CHALLENGES,
+} from "./simulation.js";
 import { initScene, renderScene, hitTestEntity, speciesLabel } from "./scene.js";
 
-const SEED = 20260101;
-let world = createWorld(SEED);
-let running = false;
+const BASE_SEED = 20260101;
+const LOCAL_KEY = "sunp-memory-v1";
+const TICK_BASE_MS = 900;
+const SAVE_EVERY = 10;
+
+let world = null;
+let running = true; // «مشاهده چرخه خودکار»
 let speed = 1;
 let timer = null;
+let storageMode = "local"; // "server" | "local"
+let saveStatus = "—";
 
-const canvas = document.getElementById("world");
+const $ = (id) => document.getElementById(id);
+const canvas = $("world");
 const ctx = initScene(canvas);
 
-const el = (id) => document.getElementById(id);
-const toggleBtn = el("toggle");
-const stepBtn = el("step");
-const resetBtn = el("reset");
-const speedInput = el("speed");
-const speedVal = el("speedVal");
-const statsEl = el("stats");
-const populationEl = el("population");
-const speciesEl = el("species");
-const policyEl = el("policy");
-const historyEl = el("history");
-const eventsEl = el("events");
-const entityDetailEl = el("entityDetail");
-const zodiacInfoEl = el("zodiacInfo");
-const sunLevelEl = el("sunLevel");
-const treeSvg = el("treeOfLife");
-const lifeCycleEl = el("lifeCycle");
+// ---------- ذخیره و بازیابی حافظه ----------
+function authHeaders() {
+  const h = { "content-type": "application/json" };
+  const token = localStorage.getItem("sunpToken");
+  if (token) h.authorization = `Bearer ${token}`;
+  return h;
+}
 
-const TICK_BASE_MS = 900;
+async function loadMemory() {
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (hash.get("token")) localStorage.setItem("sunpToken", hash.get("token"));
+  try {
+    const r = await fetch("api/memory", { cache: "no-store" });
+    if (r.ok) {
+      const j = await r.json();
+      storageMode = "server";
+      if (j && j.memory) return j.memory;
+      return null;
+    }
+  } catch (_) { /* سرور نیست؛ به حافظه مرورگر برمی‌گردیم */ }
+  storageMode = "local";
+  try {
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (_) { /* ignore */ }
+  return null;
+}
 
+async function persist() {
+  if (!world) return;
+  const mem = exportMemory(world);
+  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(mem)); } catch (_) { /* ignore */ }
+  if (storageMode === "server") {
+    try {
+      const r = await fetch("api/memory", { method: "PUT", headers: authHeaders(), body: JSON.stringify(mem), keepalive: true });
+      saveStatus = r.ok ? "ذخیره روی سرور ✓" : r.status === 401 ? "سرور: نیاز به کلید" : `سرور: خطا ${r.status}`;
+    } catch (_) {
+      saveStatus = "سرور در دسترس نیست (نسخه‌ی مرورگر ذخیره شد)";
+    }
+  } else {
+    saveStatus = "ذخیره در مرورگر ✓";
+  }
+  renderMemory();
+}
+
+async function clearMemory() {
+  if (!confirm("حافظه‌ی خورشید کاملاً پاک شود و از صفر شروع کند؟")) return;
+  try { localStorage.removeItem(LOCAL_KEY); } catch (_) { /* ignore */ }
+  if (storageMode === "server") {
+    try { await fetch("api/memory", { method: "DELETE", headers: authHeaders() }); } catch (_) { /* ignore */ }
+  }
+  world = createWorld(BASE_SEED, null);
+  saveStatus = "حافظه پاک شد";
+  renderAll();
+}
+
+// ---------- رندر ----------
 function renderStats() {
-  statsEl.innerHTML = `
+  const c = world.challenge;
+  $("stats").innerHTML = `
     <div class="stat"><span>روز</span><b>${world.day}</b></div>
     <div class="stat"><span>سلامت اکوسیستم</span><b>${Math.round(world.healthIndex)}</b></div>
     <div class="stat"><span>جمعیت</span><b>${world.population.length}</b></div>
-    <div class="stat"><span>نور</span><b>${Math.round(world.env.light)}</b></div>
-    <div class="stat"><span>آب</span><b>${Math.round(world.env.water)}</b></div>
-    <div class="stat"><span>خاک</span><b>${Math.round(world.env.soil)}</b></div>
-  `;
+    <div class="stat"><span>تاب‌آوری میانگین</span><b>${Math.round(world.avgResilience * 100)}٪</b></div>
+    <div class="stat"><span>ذره نور</span><b>${Math.round(world.lightParticles)}</b></div>
+    <div class="stat"><span>آب / خاک</span><b>${Math.round(world.env.water)} / ${Math.round(world.env.soil)}</b></div>`;
+  $("challenge").className = "challenge" + (c ? " on" : "");
+  $("challenge").textContent = c
+    ? `⚠ چالش: ${CHALLENGES[c.type].name} · شدت ${Math.round(c.severity * 100)}٪ · ${c.remaining} گام مانده · پاسخ خورشید: ${POLICY_FA[world.sun.policy]}`
+    : `وضعیت: آرامش · سیاست خورشید: ${POLICY_FA[world.sun.policy]}`;
 }
 
 function renderPopulation() {
   const counts = {};
   for (const e of world.population) counts[e.stage] = (counts[e.stage] || 0) + 1;
-  populationEl.innerHTML = Object.entries(STAGE_FA)
-    .map(([k, fa]) => `<div class="pill"><span>${fa}</span><b>${counts[k] || 0}</b></div>`)
-    .join("");
-}
-
-function renderSpecies() {
-  const counts = {};
-  for (const e of world.population) counts[e.species] = (counts[e.species] || 0) + 1;
-  speciesEl.innerHTML = Object.keys(SPECIES)
-    .map((s) => `<div class="pill"><span>${speciesLabel(s)}</span><b>${counts[s] || 0}</b></div>`)
-    .join("");
+  $("population").innerHTML = Object.entries(STAGE_FA)
+    .map(([k, fa]) => `<div class="pill"><span>${fa}</span><b>${counts[k] || 0}</b></div>`).join("");
+  const sc = {};
+  for (const e of world.population) sc[e.species] = (sc[e.species] || 0) + 1;
+  $("species").innerHTML = Object.keys(SPECIES)
+    .map((s) => `<div class="pill"><span>${speciesLabel(s)}</span><b>${sc[s] || 0}</b></div>`).join("");
 }
 
 function renderPolicy() {
-  policyEl.textContent = `${POLICY_FA[world.sun.policy]} · سطح خورشید ${world.sun.level} (چرخه خرد: ${world.sun.wisdomCycles})`;
-  sunLevelEl.textContent = world.sun.level;
-}
-
-function renderZodiac() {
+  $("policy").textContent = `${POLICY_FA[world.sun.policy]} · سطح خورشید ${world.sun.level} (چرخه خرد: ${world.sun.wisdomCycles})`;
+  $("sunLevel").textContent = world.sun.level;
   const z = getCurrentZodiac(world);
-  zodiacInfoEl.textContent = `${z.symbol} نشان فعلی: ${z.name} · روز ${world.day}`;
+  $("zodiacInfo").textContent = `${z.symbol} ${z.name} · روز ${world.day}`;
 }
 
 function renderHistory() {
-  const recent = world.history.slice(-40);
-  const max = 100;
-  historyEl.innerHTML = recent
-    .map((h) => `<span class="bar" style="height:${Math.max(2, (h.health / max) * 40)}px" title="روز ${h.tick}: سلامت ${Math.round(h.health)}"></span>`)
-    .join("");
+  $("history").innerHTML = world.history.slice(-40)
+    .map((h) => `<span class="bar" style="height:${Math.max(2, (h.health / 100) * 40)}px" title="گام ${h.tick}: سلامت ${Math.round(h.health)}"></span>`).join("");
+  $("events").innerHTML = world.events.map((e) => `<li>${e.text}</li>`).join("");
 }
 
-function renderEvents() {
-  eventsEl.innerHTML = world.events.map((e) => `<li>${e.text}</li>`).join("");
+function renderMemory() {
+  if (!world) return;
+  const s = world.stats;
+  $("memory").innerHTML = `
+    <div class="pill"><span>وضعیت ذخیره</span><b>${saveStatus}</b></div>
+    <div class="pill"><span>نسل جهان‌ها</span><b>${s.epochs}</b></div>
+    <div class="pill"><span>کل گام‌ها</span><b>${s.totalTicks}</b></div>
+    <div class="pill"><span>تجربه‌ی بازگشتی به خورشید</span><b>${Math.round(world.sun.experienceTotal)}</b></div>
+    <div class="pill"><span>چرخه خرد</span><b>${world.sun.wisdomCycles}</b></div>
+    <div class="pill"><span>بیشترین نسل موجودات</span><b>${s.generationMax}</b></div>
+    <div class="pill"><span>چالش‌ها (گذشته/کل)</span><b>${s.challengesSurvived}/${s.challengesFaced}</b></div>
+    <div class="pill"><span>بهترین سلامت</span><b>${Math.round(s.bestHealth)}</b></div>`;
+  const lessons = getLessons(world);
+  $("lessons").innerHTML = lessons.length
+    ? lessons.map((l) => `<li>«${l.stateFa}» ← ${l.policyFa} <small>(امتیاز ${l.score.toFixed(2)} · ${l.visits} بار)</small></li>`).join("")
+    : "<li>هنوز درسی آموخته نشده.</li>";
 }
 
 function renderTreeOfLife() {
@@ -85,117 +140,119 @@ function renderTreeOfLife() {
   const byLevel = Object.fromEntries(nodes.map((n) => [n.level, n]));
   const W = 220, H = 320;
   const colX = { balance: W / 2, mercy: W * 0.78, severity: W * 0.22 };
-  const rowY = (level) => H - 24 - (level - 1) * ((H - 48) / 9);
-  const pos = (n) => ({ x: colX[n.pillar], y: rowY(n.level) });
-
+  const pos = (n) => ({ x: colX[n.pillar], y: H - 24 - (n.level - 1) * ((H - 48) / 9) });
   let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" class="tree-svg">`;
-  // مسیرها
   for (const [a, b] of PATHS_22) {
-    const pa = pos(byLevel[a]);
-    const pb = pos(byLevel[b]);
-    const lit = byLevel[a].lit && byLevel[b].lit;
-    svg += `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" class="path ${lit ? "lit" : ""}" />`;
+    const pa = pos(byLevel[a]), pb = pos(byLevel[b]);
+    svg += `<line x1="${pa.x}" y1="${pa.y}" x2="${pb.x}" y2="${pb.y}" class="path ${byLevel[a].lit && byLevel[b].lit ? "lit" : ""}" />`;
   }
-  // ستون‌ها (برچسب پایین)
   svg += `<text x="${colX.mercy}" y="${H - 4}" class="pillar-label mercy">${PILLARS.mercy.name}</text>`;
   svg += `<text x="${colX.severity}" y="${H - 4}" class="pillar-label severity">${PILLARS.severity.name}</text>`;
   svg += `<text x="${colX.balance}" y="14" class="pillar-label balance">${PILLARS.balance.name}</text>`;
-  // گره‌ها
   for (const n of nodes) {
     const p = pos(n);
-    svg += `<g class="node ${n.lit ? "lit" : ""} pillar-${n.pillar}" data-level="${n.level}">
-      <circle cx="${p.x}" cy="${p.y}" r="13"></circle>
-      <text x="${p.x}" y="${p.y}" dy="0.32em">${n.name}</text>
-    </g>`;
+    svg += `<g class="node ${n.lit ? "lit" : ""} pillar-${n.pillar}" data-level="${n.level}"><circle cx="${p.x}" cy="${p.y}" r="13"></circle><text x="${p.x}" y="${p.y}" dy="0.32em">${n.name}</text></g>`;
   }
-  svg += `</svg>`;
-  treeSvg.innerHTML = svg;
-  treeSvg.querySelectorAll(".node").forEach((g) => {
+  $("treeOfLife").innerHTML = svg + "</svg>";
+  $("treeOfLife").querySelectorAll(".node").forEach((g) => {
     g.addEventListener("click", () => {
-      const level = Number(g.getAttribute("data-level"));
-      const n = nodes.find((x) => x.level === level);
-      entityDetailEl.innerHTML = `<b>${n.name} (${n.trait})</b><br>سطح ${n.level} از ۱۰ · ${n.lit ? "روشن (رسیده)" : "هنوز روشن نشده"} · ${PILLARS[n.pillar].name}`;
+      const n = nodes.find((x) => x.level === Number(g.getAttribute("data-level")));
+      $("entityDetail").innerHTML = `<b>${n.name} (${n.trait})</b><br>سطح ${n.level} از ۱۰ · ${n.lit ? "روشن (رسیده)" : "هنوز روشن نشده"} · ${PILLARS[n.pillar].name}`;
     });
   });
 }
 
-const LIFECYCLE_STAGES = ["نور خورشید", "ذره نور", "بذر", "جوانه", "گیاه", "درخت", "گل و میوه", "موجود زنده", "تولید مثل", "بازگشت به خاک", "چرخه دوباره"];
+// نوار چرخه حیات مطابق عکس مرجع: هر مرحله با شمارنده‌ی واقعی موجودات در همان مرحله
 function renderLifeCycle() {
-  const activeIdx = world.tick % LIFECYCLE_STAGES.length;
-  lifeCycleEl.innerHTML = LIFECYCLE_STAGES
-    .map((s, i) => `<div class="lc-step ${i === activeIdx ? "active" : ""}">${s}</div>`)
+  const P = world.population;
+  const n = (fn) => P.filter(fn).length;
+  const steps = [
+    ["☀️", "نور خورشید", world.sun.level],
+    ["✨", "ذره نور", Math.round(world.lightParticles)],
+    ["🌰", "بذر", n((e) => e.stage === "seed")],
+    ["🌱", "جوانه", n((e) => e.stage === "sprout")],
+    ["🌿", "گیاه", n((e) => e.stage === "immature")],
+    ["🌳", "درخت", n((e) => e.role === "producer" && e.stage === "mature")],
+    ["🌸", "گل و میوه", n((e) => e.stage === "fruiting")],
+    ["🦌", "موجود زنده", n((e) => e.role !== "producer" && e.role !== "decomposer")],
+    ["🐣", "تولید مثل", Math.round(world.recentBirths * 10) / 10],
+    ["🍂", "بازگشت به خاک", Math.round(world.recentReturns * 10) / 10],
+    ["♾️", "چرخه دوباره", world.stats.epochs + world.sun.wisdomCycles],
+  ];
+  $("lifeCycle").innerHTML = steps
+    .map(([icon, name, count]) => `<div class="lc-step ${count > 0 ? "active" : ""}"><span class="lc-icon">${icon}</span>${name}<b>${count}</b></div>`)
     .join(`<div class="lc-arrow">←</div>`);
 }
 
 function renderAll() {
-  renderScene(canvas, ctx, world);
   renderStats();
   renderPopulation();
-  renderSpecies();
   renderPolicy();
-  renderZodiac();
   renderHistory();
-  renderEvents();
+  renderMemory();
   renderTreeOfLife();
   renderLifeCycle();
 }
 
+// ---------- حلقه شبیه‌سازی ----------
 function doStep() {
   step(world);
   renderAll();
+  if (world.tick % SAVE_EVERY === 0) persist();
 }
 
 function scheduleLoop() {
   clearInterval(timer);
-  if (!running) return;
-  timer = setInterval(doStep, TICK_BASE_MS / speed);
+  if (running) timer = setInterval(doStep, TICK_BASE_MS / speed);
+  $("toggle").textContent = running ? "⏸ توقف" : "▶ شروع";
 }
 
-toggleBtn.addEventListener("click", () => {
-  running = !running;
-  toggleBtn.textContent = running ? "⏸ توقف" : "▶ شروع";
-  scheduleLoop();
-});
+function frame(t) {
+  if (world) renderScene(canvas, ctx, world, t);
+  requestAnimationFrame(frame);
+}
 
-stepBtn.addEventListener("click", () => {
-  if (running) {
-    running = false;
-    toggleBtn.textContent = "▶ شروع";
+function bindControls() {
+  $("toggle").addEventListener("click", () => { running = !running; scheduleLoop(); });
+  $("step").addEventListener("click", () => { running = false; scheduleLoop(); doStep(); });
+  $("reset").addEventListener("click", async () => {
+    await persist();
+    const mem = exportMemory(world);
+    world = createWorld(BASE_SEED + mem.stats.epochs * 7919, mem);
+    renderAll();
+  });
+  $("saveNow").addEventListener("click", () => persist());
+  $("clearMemory").addEventListener("click", clearMemory);
+  $("speed").addEventListener("input", () => {
+    speed = Number($("speed").value);
+    $("speedVal").textContent = `${speed}×`;
     scheduleLoop();
-  }
-  doStep();
-});
-
-resetBtn.addEventListener("click", () => {
-  running = false;
-  toggleBtn.textContent = "▶ شروع";
-  scheduleLoop();
-  world = createWorld(SEED);
-  renderAll();
-});
-
-speedInput.addEventListener("input", () => {
-  speed = Number(speedInput.value);
-  speedVal.textContent = `${speed}×`;
-  scheduleLoop();
-});
-
-canvas.addEventListener("click", (ev) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = ev.clientX - rect.left;
-  const y = ev.clientY - rect.top;
-  const id = hitTestEntity(world, x, y);
-  world.selectedId = id;
-  if (id) {
-    const entity = world.population.find((e) => e.id === id);
+  });
+  canvas.addEventListener("click", (ev) => {
+    const rect = canvas.getBoundingClientRect();
+    const id = hitTestEntity(world, ev.clientX - rect.left, ev.clientY - rect.top);
+    world.selectedId = id;
+    const entity = id ? world.population.find((e) => e.id === id) : null;
     if (entity) {
       const s = summarizeEntity(entity);
-      entityDetailEl.innerHTML = `<b>${s.species}</b> · ${s.stage}<br>سن ${s.age} · انرژی ${s.energy} · سلامت ${s.health} · فرزندان ${s.childCount}`;
+      $("entityDetail").innerHTML = `<b>${s.species}</b> · ${s.stage} · نسل ${s.gen}<br>سن ${s.age} · انرژی ${s.energy} · سلامت ${s.health} · تاب‌آوری ${s.resilience}٪ · تجربه ${s.experience} · فرزندان ${s.childCount}`;
+    } else {
+      $("entityDetail").textContent = "برای مشاهده جزئیات، روی یکی از موجودات یا گره‌های درخت حیات کلیک کن.";
     }
-  } else {
-    entityDetailEl.textContent = "برای مشاهده جزئیات، روی یکی از موجودات کلیک کن.";
-  }
-  renderScene(canvas, ctx, world);
-});
+  });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
+  window.addEventListener("pagehide", () => persist());
+}
 
-renderAll();
+async function init() {
+  const memory = await loadMemory();
+  const epoch = memory && memory.stats && Number.isFinite(memory.stats.epochs) ? memory.stats.epochs : 0;
+  world = createWorld(BASE_SEED + epoch * 7919, memory);
+  saveStatus = memory ? (storageMode === "server" ? "بارگذاری از سرور ✓" : "بارگذاری از مرورگر ✓") : "حافظه‌ی تازه";
+  bindControls();
+  renderAll();
+  scheduleLoop();
+  requestAnimationFrame(frame);
+}
+
+init();

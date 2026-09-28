@@ -12,7 +12,7 @@
 </header>
 <main>
   <section class="toolbar panel">
-    <button id="toggle">▶ شروع</button><button id="step">گام بعدی</button><button id="reset" class="secondary">بازنشانی</button>
+    <button id="toggle">⏸ توقف</button><button id="step">گام بعدی</button><button id="reset" class="secondary">جهان جدید (حافظه حفظ می‌شود)</button>
     <label>سرعت <input id="speed" type="range" min="1" max="5" value="1"><output id="speedVal">۱×</output></label>
     <span id="zodiacInfo" class="zodiac-info"></span>
   </section>
@@ -25,11 +25,12 @@
       <span class="live-tag">● شبیه‌سازی زنده</span>
     </div>
     <canvas id="world" aria-label="نمای متحرک اکوسیستم و حلقه زودیاک" role="img"></canvas>
+    <div id="challenge" class="challenge"></div>
     <div id="entityDetail" class="entity-detail">برای مشاهده جزئیات، روی یکی از موجودات یا گره‌های درخت حیات کلیک کن.</div>
   </section>
 
   <section class="lifecycle-strip panel">
-    <h2>چرخه حیات (نور خورشید تا بازگشت دوباره)</h2>
+    <h2>چرخه حیات: از نور خورشید تا بازگشت دوباره</h2>
     <div id="lifeCycle" class="lc-row"></div>
   </section>
 
@@ -62,6 +63,15 @@
     </article>
   </section>
 
+  <section class="panel memory-panel">
+    <h2>حافظه‌ی خورشید (ماندگار)</h2>
+    <p class="hint">تجربه‌ی موجودات پس از پایان عمر به خورشید برمی‌گردد و ذخیره می‌شود؛ با «جهان جدید» یا بستن صفحه، خورشید از صفر شروع نمی‌کند.</p>
+    <div id="memory" class="population"></div>
+    <div class="mem-actions"><button id="saveNow" class="secondary">ذخیره‌ی الان</button><button id="clearMemory" class="secondary danger">پاک‌کردن حافظه</button></div>
+    <h2>درس‌هایی که خورشید آموخته</h2>
+    <ul id="lessons" class="rules"></ul>
+  </section>
+
   <section class="panel">
     <h2>منطق و قواعد مدل</h2>
     <ul class="rules">
@@ -71,6 +81,8 @@
       <li>تولیدکنندگان از نور و منابع رشد می‌کنند؛ مصرف‌کنندگان از زیست‌توده تغذیه می‌کنند؛ شکارچی فشار مصرف‌کنندگان را تغییر می‌دهد؛ تجزیه‌کننده مواد را به خاک بازمی‌گرداند.</li>
       <li>هر موجود سن، انرژی، سلامت، رشد، مرحله حیات و نسبت خانوادگی دارد؛ تولیدمثل به شرایط و انرژی وابسته است.</li>
       <li>خورشید مانند یک عامل یادگیرنده، با بهبود سلامت اکوسیستم «تجربه» می‌گیرد و در درخت حیات از ملکوت تا کتر رشد می‌کند؛ رسیدن به کتر یک چرخه کامل و بازگشت به ابتدا را رقم می‌زند.</li>
+      <li>موجودات از ذره‌های نور خورشید به شکل بذر متولد می‌شوند، رشد می‌کنند، با چالش‌ها (خشکسالی، سرما، بیماری، سیل) روبه‌رو می‌شوند و تاب‌آوری و تجربه می‌گیرند؛ در پایان عمر، تجربه و انرژی‌شان به خورشید برمی‌گردد و مواد آن‌ها به خاک.</li>
+      <li>هرچه تجربه‌ی خورشید بیشتر شود، موجودات نسل‌های بعد قوی‌تر متولد می‌شوند و چالش‌ها ضعیف‌تر اثر می‌گذارند؛ این حافظه بین اجراها حفظ می‌شود.</li>
       <li>این یک مدل مفهومی و نمادین با پارامترهای فرضی است، نه شبیه‌سازی علمی زمین، خورشید یا ادعای عرفانی واقعی.</li>
     </ul>
   </section>

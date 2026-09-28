@@ -1,9 +1,11 @@
 {
   "name": "sunp",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "SunP — شبیه‌ساز نمادین چرخه حیات، زودیاک و درخت حیات با خورشید تطبیقی",
   "type": "module",
   "scripts": {
-    "test": "node tests/simulation.test.js"
+    "test": "node tests/simulation.test.js",
+    "test:server": "node tests/server.test.js",
+    "start": "node server.js"
   }
 }

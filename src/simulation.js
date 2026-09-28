@@ -1,8 +1,11 @@
 // src/simulation.js
-// موتور مدل: اکوسیستم چرخه حیات + خورشید تطبیقی (که مثل یک عامل یادگیرنده رشد می‌کند)
-// + حلقه زودیاک (۱۲ نشان) که محیط را تحت تاثیر قرار می‌دهد
-// + درخت حیات نمادین (۱۰ سفیروت + ۳ ستون + ۲۲ مسیر) که سطح رشد خورشید را نشان می‌دهد.
-// این یک مدل نمادین و قابل توضیح است، نه شبیه‌سازی علمی زمین یا خورشید.
+// موتور مدل SunP — نسخه ۳
+// چرخه: نور خورشید ← ذره نور ← بذر ← جوانه ← گیاه ← درخت ← گل و میوه ← موجود زنده ← تولیدمثل ← بازگشت به خاک ← چرخه دوباره
+// موجودات از انرژی خورشید متولد می‌شوند، با چالش‌ها روبه‌رو می‌شوند، تجربه می‌گیرند و در پایان عمر تجربه‌شان را به خورشید برمی‌گردانند.
+// خورشید یک عامل یادگیرنده‌ی نمادین است (جدول ارزش سیاست‌ها به تفکیک وضعیت) و حافظه‌اش قابل ذخیره و بارگذاری است.
+// این یک مدل نمادین با پارامترهای فرضی است، نه شبیه‌سازی علمی.
+
+export const MEMORY_VERSION = 1;
 
 export function createRng(seed) {
   let s = seed >>> 0 || 1;
@@ -19,7 +22,7 @@ export function clamp(v, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
 }
 
-// ---------- زودیاک: ۱۲ نشان ----------
+// ---------- زودیاک ----------
 export const ZODIAC = [
   { id: "aries", name: "حمل", symbol: "♈" },
   { id: "taurus", name: "ثور", symbol: "♉" },
@@ -36,8 +39,7 @@ export const ZODIAC = [
 ];
 export const DAYS_PER_SIGN = 30;
 
-// ---------- درخت حیات: ۱۰ سفیروت (از پایین به بالا = مسیر رشد خورشید) ----------
-// level 1 = پایین‌ترین (ملکوت) ... level 10 = بالاترین (کتر)
+// ---------- درخت حیات ----------
 export const SEPHIROT = [
   { id: "malkuth", level: 1, name: "ملکوت", trait: "تجلی", pillar: "balance" },
   { id: "yesod", level: 2, name: "یسود", trait: "بنیاد", pillar: "balance" },
@@ -55,7 +57,6 @@ export const PILLARS = {
   severity: { name: "ستون سختی", color: "#5fa8e0" },
   balance: { name: "ستون تعادل", color: "#e05f5f" },
 };
-// ۲۲ مسیر سنتی درخت حیات (فقط برای رسم؛ بر اساس شماره‌ی level گره‌ها)
 export const PATHS_22 = [
   [10, 9], [10, 8], [10, 5],
   [9, 8], [9, 7], [9, 5],
@@ -68,7 +69,7 @@ export const PATHS_22 = [
   [2, 1],
 ];
 
-// ---------- گونه‌ها ----------
+// ---------- گونه‌ها و مراحل ----------
 export const SPECIES = {
   tree: { role: "producer", name: "درخت", lifespan: 420, matureAge: 70 },
   flower: { role: "producer", name: "گل", lifespan: 150, matureAge: 20 },
@@ -78,80 +79,233 @@ export const SPECIES = {
   predator: { role: "predator", diet: ["consumer"], name: "شکارچی", lifespan: 260, matureAge: 45 },
   fungus: { role: "decomposer", name: "قارچ", lifespan: 110, matureAge: 15 },
 };
-export const LIFE_STAGES = ["seed", "sprout", "immature", "mature", "aging", "returning"];
+export const LIFE_STAGES = ["seed", "sprout", "immature", "mature", "fruiting", "aging", "returning"];
 export const STAGE_FA = {
-  seed: "بذر", sprout: "جوانه", immature: "نابالغ", mature: "بالغ", aging: "پیری", returning: "بازگشت",
+  seed: "بذر",
+  sprout: "جوانه",
+  immature: "گیاه (رشد)",
+  mature: "بالغ",
+  fruiting: "گل و میوه",
+  aging: "پیری",
+  returning: "بازگشت به خاک",
 };
 
 export const SUN_POLICIES = ["repair", "conserve", "balance", "diversity"];
-export const POLICY_FA = {
-  repair: "ترمیم", conserve: "صرفه‌جویی", balance: "تعادل", diversity: "تنوع",
-};
+export const POLICY_FA = { repair: "ترمیم", conserve: "صرفه‌جویی", balance: "تعادل", diversity: "تنوع" };
 
-function stageFor(entity) {
-  const sp = SPECIES[entity.species];
-  const a = entity.age;
-  if (entity.health <= 0 || entity.energy <= 0 || a >= sp.lifespan) return "returning";
+// ---------- چالش‌ها ----------
+export const CHALLENGES = {
+  drought: { name: "خشکسالی", prior: "conserve" },
+  cold: { name: "سرمای شدید", prior: "repair" },
+  blight: { name: "بیماری گیاهی", prior: "diversity" },
+  flood: { name: "سیل", prior: "balance" },
+};
+export const STATE_FA = {
+  calm: "آرامش",
+  drought: CHALLENGES.drought.name,
+  cold: CHALLENGES.cold.name,
+  blight: CHALLENGES.blight.name,
+  flood: CHALLENGES.flood.name,
+};
+const STATE_KEYS = ["calm", ...Object.keys(CHALLENGES)];
+
+// ---------- کمکی ----------
+function stageFor(e) {
+  const sp = SPECIES[e.species];
+  const a = e.age;
+  if (e.health <= 0 || e.energy <= 0 || a >= sp.lifespan) return "returning";
   if (a < sp.matureAge * 0.15) return "seed";
   if (a < sp.matureAge * 0.5) return "sprout";
   if (a < sp.matureAge) return "immature";
-  if (a < sp.lifespan * 0.75) return "mature";
+  if (a < sp.matureAge * 1.6) return "mature";
+  if (a < sp.lifespan * 0.7) return "fruiting";
   return "aging";
 }
 
-let idCounter = 1;
-function makeEntity(world, species, parentId = null) {
+// هرچه خورشید باتجربه‌تر شود، موجودات تازه‌متولد قوی‌تر (تاب‌آورتر) به دنیا می‌آیند
+export function getSunBonus(world) {
+  const s = world.sun;
+  return Math.min(0.4, s.experienceTotal / 3000 + 0.02 * s.level + 0.03 * s.wisdomCycles);
+}
+
+function makeEntity(world, species, parent = null) {
   const sp = SPECIES[species];
-  const angle = world.rng() * Math.PI * 2;
-  const radius = 0.15 + world.rng() * 0.8;
+  const bonus = getSunBonus(world);
+  const parentRes = parent ? parent.resilience : 0;
   const e = {
-    id: idCounter++,
+    id: world.nextId++,
     species,
     role: sp.role,
     stage: "seed",
     age: 0,
-    energy: 55 + world.rng() * 20,
-    health: 70 + world.rng() * 20,
+    energy: clamp(55 + world.rng() * 20 + bonus * 20),
+    health: clamp(70 + world.rng() * 20 + bonus * 10),
     growth: 0,
     biomass: 5,
-    pos: { r: radius, a: angle },
-    parentId,
+    pos: { r: 0.15 + world.rng() * 0.8, a: world.rng() * Math.PI * 2 },
+    parentId: parent ? parent.id : null,
     childCount: 0,
+    gen: parent ? parent.gen + 1 : 0,
+    experience: 0,
+    resilience: clamp(0.5 * parentRes + 0.5 * bonus + world.rng() * 0.05, 0, 0.95),
+    survived: 0,
   };
+  world.stats.born += 1;
+  if (e.gen > world.stats.generationMax) world.stats.generationMax = e.gen;
   return e;
 }
 
-export function createWorld(seed = 20260101) {
+function zeroPolicies() {
+  return { repair: 0, conserve: 0, balance: 0, diversity: 0 };
+}
+
+function ensureState(sun, key) {
+  if (!sun.values[key]) {
+    sun.values[key] = zeroPolicies();
+    sun.visits[key] = zeroPolicies();
+    const prior = key === "calm" ? "balance" : CHALLENGES[key].prior;
+    sun.values[key][prior] = 0.5;
+  }
+  return sun.values[key];
+}
+
+function bestPolicy(vals) {
+  let best = SUN_POLICIES[0];
+  for (const p of SUN_POLICIES) if (vals[p] > vals[best]) best = p;
+  return best;
+}
+
+function defaultSun() {
+  return {
+    policy: "balance",
+    lastState: "calm",
+    values: {},
+    visits: {},
+    best: {},
+    memory: [],
+    xp: 0,
+    level: 1,
+    wisdomCycles: 0,
+    experienceTotal: 0,
+    pillarCharge: { mercy: 10, severity: 10, balance: 10 },
+  };
+}
+
+function defaultStats() {
+  return { totalTicks: 0, epochs: 1, born: 0, died: 0, challengesFaced: 0, challengesSurvived: 0, bestHealth: 0, generationMax: 0 };
+}
+
+// ---------- حافظه‌ی ماندگار ----------
+const num = (v, d = 0, min = -1e12, max = 1e12) => (Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : d);
+
+export function sanitizeMemory(raw) {
+  if (!raw || typeof raw !== "object" || !raw.sun || typeof raw.sun !== "object") return null;
+  const s = raw.sun;
+  const values = {};
+  const visits = {};
+  for (const key of STATE_KEYS) {
+    const vv = s.values && s.values[key];
+    if (!vv || typeof vv !== "object") continue;
+    const vi = (s.visits && s.visits[key]) || {};
+    values[key] = {};
+    visits[key] = {};
+    for (const p of SUN_POLICIES) {
+      values[key][p] = num(vv[p], 0, -50, 50);
+      visits[key][p] = Math.floor(num(vi[p], 0, 0, 1e7));
+    }
+  }
+  const pc = s.pillarCharge || {};
+  const st = raw.stats || {};
+  return {
+    version: MEMORY_VERSION,
+    sun: {
+      values,
+      visits,
+      xp: num(s.xp, 0, 0, 1e6),
+      level: Math.floor(num(s.level, 1, 1, 10)),
+      wisdomCycles: Math.floor(num(s.wisdomCycles, 0, 0, 1e6)),
+      experienceTotal: num(s.experienceTotal, 0, 0, 1e9),
+      pillarCharge: {
+        mercy: num(pc.mercy, 10, 0, 100),
+        severity: num(pc.severity, 10, 0, 100),
+        balance: num(pc.balance, 10, 0, 100),
+      },
+    },
+    stats: {
+      totalTicks: Math.floor(num(st.totalTicks, 0, 0, 1e12)),
+      epochs: Math.floor(num(st.epochs, 1, 1, 1e9)),
+      born: Math.floor(num(st.born, 0, 0, 1e12)),
+      died: Math.floor(num(st.died, 0, 0, 1e12)),
+      challengesFaced: Math.floor(num(st.challengesFaced, 0, 0, 1e9)),
+      challengesSurvived: Math.floor(num(st.challengesSurvived, 0, 0, 1e9)),
+      bestHealth: num(st.bestHealth, 0, 0, 100),
+      generationMax: Math.floor(num(st.generationMax, 0, 0, 1e9)),
+    },
+  };
+}
+
+export function exportMemory(world) {
+  return sanitizeMemory({ version: MEMORY_VERSION, sun: world.sun, stats: world.stats });
+}
+
+function applyMemory(world, mem) {
+  const clean = sanitizeMemory(mem);
+  if (!clean) return false;
+  const sun = world.sun;
+  sun.values = clean.sun.values;
+  sun.visits = clean.sun.visits;
+  sun.xp = clean.sun.xp;
+  sun.level = clean.sun.level;
+  sun.wisdomCycles = clean.sun.wisdomCycles;
+  sun.experienceTotal = clean.sun.experienceTotal;
+  sun.pillarCharge = clean.sun.pillarCharge;
+  for (const key of Object.keys(sun.values)) sun.best[key] = bestPolicy(sun.values[key]);
+  world.stats = { ...clean.stats, epochs: clean.stats.epochs + 1 };
+  return true;
+}
+
+export function getLessons(world) {
+  const out = [];
+  for (const key of Object.keys(world.sun.values)) {
+    const vals = world.sun.values[key];
+    const visits = SUN_POLICIES.reduce((a, p) => a + world.sun.visits[key][p], 0);
+    const best = bestPolicy(vals);
+    out.push({ state: key, stateFa: STATE_FA[key], policy: best, policyFa: POLICY_FA[best], score: vals[best], visits });
+  }
+  return out.sort((a, b) => b.visits - a.visits);
+}
+
+// ---------- ساخت جهان ----------
+export function createWorld(seed = 20260101, memory = null) {
   const world = {
     rng: createRng(seed),
+    nextId: 1,
     tick: 0,
     day: 0,
     zodiacIndex: 0,
     env: { light: 60, temp: 20, water: 55, soil: 60, nutrients: 50, oxygen: 55, biomass: 45, organic: 15 },
+    lightParticles: 0,
     population: [],
     populationCap: 42,
-    sun: {
-      policy: "balance",
-      values: { repair: 0, conserve: 0, balance: 0, diversity: 0 },
-      memory: [],
-      xp: 0,
-      level: 1,
-      wisdomCycles: 0,
-      lastHealth: 50,
-      pillarCharge: { mercy: 10, severity: 10, balance: 10 },
-    },
+    challenge: null,
+    sun: defaultSun(),
+    stats: defaultStats(),
     healthIndex: 50,
+    avgResilience: 0,
+    recentBirths: 0,
+    recentReturns: 0,
     history: [],
     events: [],
     selectedId: null,
+    turn: { expReturned: 0, premature: 0 },
   };
-  seedInitialPopulation(world);
+  applyMemory(world, memory);
+  ensureState(world.sun, "calm");
+  world.sun.lastState = "calm";
+  for (const s of ["tree", "tree", "flower", "flower", "herbivore", "pollinator", "fungus"]) {
+    world.population.push(makeEntity(world, s));
+  }
   return world;
-}
-
-function seedInitialPopulation(world) {
-  const starters = ["tree", "tree", "flower", "flower", "herbivore", "pollinator", "fungus"];
-  for (const s of starters) world.population.push(makeEntity(world, s));
 }
 
 function logEvent(world, text) {
@@ -159,14 +313,12 @@ function logEvent(world, text) {
   if (world.events.length > 12) world.events.length = 12;
 }
 
-// ---------- محیط: تحت تاثیر زودیاک ----------
+// ---------- محیط و زودیاک ----------
 function updateEnvironment(world) {
   world.day += 1;
-  if (world.day % DAYS_PER_SIGN === 0) {
-    world.zodiacIndex = (world.zodiacIndex + 1) % ZODIAC.length;
-  }
+  if (world.day % DAYS_PER_SIGN === 0) world.zodiacIndex = (world.zodiacIndex + 1) % ZODIAC.length;
   const angle = (world.zodiacIndex / ZODIAC.length) * Math.PI * 2;
-  const warmth = Math.cos(angle - Math.PI); // اوج در اسد (تابستان)، کف در دلو (زمستان)
+  const warmth = Math.cos(angle - Math.PI);
   const env = world.env;
   env.light = clamp(50 + 32 * warmth + (world.rng() - 0.5) * 4);
   env.temp = clamp(18 + 14 * warmth + (world.rng() - 0.5) * 3, -20, 60);
@@ -175,33 +327,109 @@ function updateEnvironment(world) {
   env.oxygen = clamp(env.oxygen + (world.rng() - 0.5) * 1.5);
 }
 
-// ---------- خورشید تطبیقی: انتخاب سیاست + شارژ ستون‌ها ----------
+// ---------- چالش‌ها ----------
+function challengeMitigation(world) {
+  const s = world.sun;
+  return Math.min(0.5, 0.03 * s.level + 0.04 * s.wisdomCycles + s.experienceTotal / 10000);
+}
+
+function updateChallenge(world) {
+  const c = world.challenge;
+  if (c) {
+    applyChallengeEffects(world, c);
+    c.remaining -= 1;
+    if (c.remaining <= 0) {
+      world.stats.challengesSurvived += 1;
+      logEvent(world, `چالش «${CHALLENGES[c.type].name}» تمام شد؛ جهان دوام آورد.`);
+      world.challenge = null;
+    }
+    return;
+  }
+  if (world.rng() < 0.02) {
+    const types = Object.keys(CHALLENGES);
+    const type = types[Math.floor(world.rng() * types.length)];
+    const duration = 8 + Math.floor(world.rng() * 13);
+    const severity = (0.4 + world.rng() * 0.6) * (1 - challengeMitigation(world));
+    world.challenge = { type, remaining: duration, duration, severity };
+    world.stats.challengesFaced += 1;
+    logEvent(world, `چالش تازه: ${CHALLENGES[type].name} (شدت ${Math.round(severity * 100)}٪)`);
+  }
+}
+
+function applyChallengeEffects(world, c) {
+  const env = world.env;
+  const sev = c.severity;
+  if (c.type === "drought") {
+    env.water = clamp(env.water - 2.4 * sev);
+    env.soil = clamp(env.soil - 0.6 * sev);
+  } else if (c.type === "cold") {
+    env.temp -= 12 * sev;
+    env.light = clamp(env.light - 10 * sev);
+  } else if (c.type === "blight") {
+    env.nutrients = clamp(env.nutrients - 1.0 * sev);
+  } else if (c.type === "flood") {
+    env.soil = clamp(env.soil - 1.4 * sev);
+    env.oxygen = clamp(env.oxygen - 0.8 * sev);
+  }
+  for (const e of world.population) {
+    let dmg = 0;
+    const producer = e.role === "producer";
+    if (c.type === "drought") dmg = producer || e.species === "aquatic" ? 2.6 : 0.8;
+    else if (c.type === "cold") dmg = e.role === "decomposer" ? 0.3 : e.role === "producer" ? 1.0 : 2.0;
+    else if (c.type === "blight") dmg = producer ? 3.0 : e.role === "decomposer" ? 0 : 0.3;
+    else if (c.type === "flood") dmg = e.species === "aquatic" ? 0 : e.role === "producer" ? 1.0 : 1.8;
+    dmg *= sev * (1 - 0.7 * e.resilience);
+    if (dmg > 0) {
+      e.health = clamp(e.health - dmg);
+      e.energy = clamp(e.energy - dmg * 0.4);
+      e.experience += 0.5 * sev;
+      e.resilience = Math.min(0.95, e.resilience + 0.003 * sev);
+      e.survived += 1;
+    }
+  }
+}
+
+// ---------- خورشید تطبیقی ----------
 function weakestPillar(sun) {
   return Object.entries(sun.pillarCharge).sort((a, b) => a[1] - b[1])[0][0];
 }
 
 function sunDecidePolicy(world) {
   const sun = world.sun;
-  const alpha = 0.25;
-  const outcome = world.healthIndex - sun.lastHealth;
-  sun.values[sun.policy] = sun.values[sun.policy] + alpha * (outcome - sun.values[sun.policy]);
-  sun.memory.push({ policy: sun.policy, outcome, tick: world.tick });
-  if (sun.memory.length > 24) sun.memory.shift();
-
-  const eps = 0.12;
+  const key = world.challenge ? world.challenge.type : "calm";
+  const vals = ensureState(sun, key);
+  const eps = Math.max(0.03, 0.18 - 0.012 * sun.level - 0.01 * sun.wisdomCycles);
   let policy;
-  if (world.env.biomass < 22) policy = "repair";
-  else if (world.env.water < 20 || world.env.soil < 20) policy = "conserve";
-  else if (world.env.nutrients < 22) policy = "diversity";
+  if (world.env.biomass < 15) policy = "repair";
+  else if (world.env.water < 12 || world.env.soil < 12) policy = "conserve";
   else if (world.rng() < eps) policy = SUN_POLICIES[Math.floor(world.rng() * SUN_POLICIES.length)];
-  else policy = Object.entries(sun.values).sort((a, b) => b[1] - a[1])[0][0];
-
+  else policy = bestPolicy(vals);
+  sun.lastState = key;
   sun.policy = policy;
+
   const pillar = policy === "repair" ? "mercy" : policy === "conserve" ? "severity" : policy === "balance" ? "balance" : weakestPillar(sun);
   sun.pillarCharge[pillar] = clamp(sun.pillarCharge[pillar] + 9);
-  for (const k of Object.keys(sun.pillarCharge)) {
-    if (k !== pillar) sun.pillarCharge[k] = clamp(sun.pillarCharge[k] - 2.5);
+  for (const k of Object.keys(sun.pillarCharge)) if (k !== pillar) sun.pillarCharge[k] = clamp(sun.pillarCharge[k] - 2.5);
+}
+
+// یادگیری: پاداش این گام به سیاستی که در این گام اجرا شد نسبت داده می‌شود
+function sunLearn(world, reward) {
+  const sun = world.sun;
+  const key = sun.lastState;
+  const vals = ensureState(sun, key);
+  const visits = sun.visits[key];
+  visits[sun.policy] += 1;
+  const alpha = Math.max(0.03, 1 / (visits[sun.policy] + 2));
+  vals[sun.policy] = clamp(vals[sun.policy] + alpha * (reward - vals[sun.policy]), -50, 50);
+  sun.memory.push({ policy: sun.policy, state: key, reward, tick: world.tick });
+  if (sun.memory.length > 24) sun.memory.shift();
+
+  const best = bestPolicy(vals);
+  const total = SUN_POLICIES.reduce((a, p) => a + visits[p], 0);
+  if (sun.best[key] && sun.best[key] !== best && total >= 12) {
+    logEvent(world, `خورشید یاد گرفت: در «${STATE_FA[key]}» بهترین سیاست «${POLICY_FA[best]}» است.`);
   }
+  sun.best[key] = best;
 }
 
 function applyPolicyEffects(world) {
@@ -224,26 +452,48 @@ function applyPolicyEffects(world) {
   }
 }
 
+// ---------- نور خورشید ← ذره نور ← بذر ----------
+function emitLightAndSeeds(world) {
+  const env = world.env;
+  const sun = world.sun;
+  world.lightParticles = clamp(world.lightParticles * 0.97 + (env.light / 100) * (1.5 + sun.level * 0.5), 0, 60);
+  const producers = world.population.filter((e) => e.role === "producer");
+  if (
+    world.population.length < world.populationCap &&
+    producers.length < world.populationCap * 0.5 &&
+    world.lightParticles >= 6 &&
+    env.soil > 25 && env.water > 20 && env.nutrients > 10 &&
+    world.rng() < 0.08
+  ) {
+    world.lightParticles -= 6;
+    const trees = producers.filter((e) => e.species === "tree").length;
+    const flowers = producers.length - trees;
+    const species = trees * 2 <= flowers ? "tree" : world.rng() < 0.35 ? "tree" : "flower";
+    world.population.push(makeEntity(world, species));
+    env.nutrients = clamp(env.nutrients - 0.5);
+  }
+}
+
 // ---------- زیست‌شناسی ----------
 function growProducers(world) {
   const env = world.env;
   for (const e of world.population) {
-    if (SPECIES[e.species].role !== "producer") continue;
-    const factor = (env.light / 100) * 0.5 + (env.water / 100) * 0.3 + (env.soil / 100) * 0.2;
-    e.growth = clamp(e.growth + factor * 3);
-    e.energy = clamp(e.energy + factor * 4 - 0.6);
-    e.biomass = clamp(e.biomass + factor * 1.5, 0, 100);
-    env.biomass = clamp(env.biomass + factor * 0.15);
+    if (e.role !== "producer") continue;
+    const f = (env.light / 100) * 0.5 + (env.water / 100) * 0.3 + (env.soil / 100) * 0.2;
+    e.growth = clamp(e.growth + f * 3);
+    e.energy = clamp(e.energy + f * 4 - 0.6);
+    e.biomass = clamp(e.biomass + f * 1.5);
+    env.biomass = clamp(env.biomass + f * 0.15);
+    if (e.stage === "fruiting") env.biomass = clamp(env.biomass + 0.12);
   }
 }
 
 function feedConsumers(world) {
   const env = world.env;
-  const producers = world.population.filter((e) => SPECIES[e.species].role === "producer" && e.stage !== "returning");
+  const hasProducers = world.population.some((e) => e.role === "producer" && e.stage !== "returning");
   for (const e of world.population) {
-    const sp = SPECIES[e.species];
-    if (sp.role !== "consumer") continue;
-    if (producers.length > 0 && env.biomass > 5) {
+    if (e.role !== "consumer") continue;
+    if (hasProducers && env.biomass > 5) {
       env.biomass = clamp(env.biomass - 0.4);
       e.energy = clamp(e.energy + 2.6);
       e.health = clamp(e.health + 0.4);
@@ -254,14 +504,14 @@ function feedConsumers(world) {
 }
 
 function predatorPressure(world) {
-  const preyPool = world.population.filter((e) => SPECIES[e.species].role === "consumer" && e.stage !== "returning");
+  const prey = world.population.filter((e) => e.role === "consumer" && e.stage !== "returning");
   for (const e of world.population) {
-    if (SPECIES[e.species].role !== "predator") continue;
-    if (preyPool.length > 2) {
+    if (e.role !== "predator") continue;
+    if (prey.length > 2) {
       e.energy = clamp(e.energy + 3);
       e.health = clamp(e.health + 0.5);
-      const victim = preyPool[Math.floor(world.rng() * preyPool.length)];
-      if (victim) victim.health = clamp(victim.health - 6);
+      const victim = prey[Math.floor(world.rng() * prey.length)];
+      if (victim) victim.health = clamp(victim.health - 6 * (1 - 0.5 * victim.resilience));
     } else {
       e.energy = clamp(e.energy - 2);
     }
@@ -270,66 +520,74 @@ function predatorPressure(world) {
 
 function decomposeOrganic(world) {
   const env = world.env;
-  let organicToSoil = 0;
+  let toSoil = 0;
   for (const e of world.population) {
-    if (SPECIES[e.species].role !== "decomposer") continue;
+    if (e.role !== "decomposer") continue;
     if (env.organic > 2) {
       env.organic = clamp(env.organic - 1.5);
-      organicToSoil += 1.1;
+      toSoil += 1.1;
       e.energy = clamp(e.energy + 1.4);
     }
   }
-  env.soil = clamp(env.soil + organicToSoil);
-  env.nutrients = clamp(env.nutrients + organicToSoil * 0.5);
+  env.soil = clamp(env.soil + toSoil);
+  env.nutrients = clamp(env.nutrients + toSoil * 0.5);
 }
 
-function ageAndProgressStages(world) {
+function ageAndProgress(world) {
   for (const e of world.population) {
     e.age += 1;
     e.energy = clamp(e.energy - 0.35);
     e.health = clamp(e.health - 0.2 + (e.energy > 40 ? 0.15 : -0.2));
+    e.experience += 0.02;
     e.stage = stageFor(e);
   }
 }
 
 function handleReproduction(world) {
+  world.recentBirths *= 0.6;
   if (world.population.length >= world.populationCap) return;
-  const speciesCounts = {};
-  for (const e of world.population) speciesCounts[e.species] = (speciesCounts[e.species] || 0) + 1;
+  const counts = {};
+  for (const e of world.population) counts[e.species] = (counts[e.species] || 0) + 1;
   const diversityBoost = world.sun.policy === "diversity";
   const born = [];
   for (const e of world.population) {
-    if (e.stage !== "mature") continue;
+    if (e.stage !== "mature" && e.stage !== "fruiting") continue;
     if (e.health < 55 || e.energy < 45) continue;
-    const rarity = diversityBoost ? 1 / (1 + (speciesCounts[e.species] || 1)) : 0.15;
-    const chance = 0.02 + rarity * 0.06;
+    const rarity = diversityBoost ? 1 / (1 + (counts[e.species] || 1)) : 0.15;
+    const chance = (0.02 + rarity * 0.06) * (e.stage === "fruiting" ? 1.5 : 1);
     if (world.rng() < chance) {
-      const child = makeEntity(world, e.species, e.id);
+      born.push(makeEntity(world, e.species, e));
       e.childCount += 1;
       e.energy = clamp(e.energy - 12);
-      born.push(child);
     }
   }
   for (const c of born) world.population.push(c);
+  world.recentBirths += born.length;
 }
 
+// بازگشت به خاک: مواد به خاک، انرژی و «تجربه» به خورشید
 function handleDeaths(world) {
+  world.recentReturns *= 0.6;
   const alive = [];
-  let releasedBiomass = 0;
-  let sunFeed = 0;
+  let biomass = 0;
+  let died = 0;
   for (const e of world.population) {
-    const dying = e.stage === "returning" && (e.age > SPECIES[e.species].lifespan || e.health <= 0 || e.energy <= 0);
-    if (dying) {
-      releasedBiomass += e.biomass * 0.6;
-      sunFeed += e.energy * 0.3;
-    } else {
+    if (e.stage !== "returning") {
       alive.push(e);
+      continue;
     }
+    died += 1;
+    biomass += e.biomass * 0.6;
+    world.sun.experienceTotal += e.experience;
+    world.sun.xp += e.experience * 0.15 + e.energy * 0.01;
+    world.turn.expReturned += e.experience;
+    if (e.age < SPECIES[e.species].lifespan * 0.7) world.turn.premature += 1;
   }
   world.population = alive;
-  world.env.organic = clamp(world.env.organic + releasedBiomass * 0.4);
-  world.env.nutrients = clamp(world.env.nutrients + releasedBiomass * 0.2);
-  world.sun.xp += sunFeed * 0.05;
+  world.stats.died += died;
+  world.recentReturns += died;
+  world.env.organic = clamp(world.env.organic + biomass * 0.4);
+  world.env.nutrients = clamp(world.env.nutrients + biomass * 0.2);
 
   if (world.population.length === 0 && world.env.biomass > 25) {
     world.population.push(makeEntity(world, "tree"));
@@ -337,30 +595,30 @@ function handleDeaths(world) {
   }
 }
 
-function computeEcosystemHealth(world) {
+function computeHealth(world) {
   const roles = { producer: 0, consumer: 0, predator: 0, decomposer: 0 };
   let healthSum = 0;
-  const speciesSeen = new Set();
+  let resSum = 0;
+  const seen = new Set();
   for (const e of world.population) {
-    roles[SPECIES[e.species].role] += 1;
+    roles[e.role] += 1;
     healthSum += e.health;
-    speciesSeen.add(e.species);
+    resSum += e.resilience;
+    seen.add(e.species);
   }
   const n = world.population.length || 1;
-  const avgHealth = healthSum / n;
+  world.avgResilience = resSum / n;
   const balance = 100 - (Math.abs(roles.producer - roles.consumer) * 3 + Math.abs(roles.consumer - roles.predator * 3) * 1.5);
-  const resources = (world.env.biomass + world.env.soil + world.env.water + world.env.nutrients + world.env.oxygen) / 5;
-  const diversity = (speciesSeen.size / Object.keys(SPECIES).length) * 100;
-  const score = avgHealth * 0.35 + clamp(balance) * 0.2 + resources * 0.25 + diversity * 0.2;
-  return clamp(score);
+  const env = world.env;
+  const resources = (env.biomass + env.soil + env.water + env.nutrients + env.oxygen) / 5;
+  const diversity = (seen.size / Object.keys(SPECIES).length) * 100;
+  return clamp((healthSum / n) * 0.35 + clamp(balance) * 0.2 + resources * 0.25 + diversity * 0.2);
 }
 
-// ---------- رشد خورشید مثل یک عامل هوشمند: صعود از ملکوت تا کتر ----------
-function updateSunGrowth(world) {
+// ---------- رشد خورشید در درخت حیات ----------
+function updateSunGrowth(world, reward) {
   const sun = world.sun;
-  const reward = world.healthIndex - sun.lastHealth;
-  sun.lastHealth = world.healthIndex;
-  sun.xp += Math.max(0, reward) * 0.6 + 0.15;
+  sun.xp += Math.max(0, reward) * 0.6 + 0.25;
   const need = sun.level * 55 + 40;
   if (sun.xp >= need) {
     sun.xp -= need;
@@ -376,47 +634,56 @@ function updateSunGrowth(world) {
   }
 }
 
-function recordHistory(world) {
-  world.history.push({ tick: world.tick, health: world.healthIndex, population: world.population.length, sunLevel: world.sun.level });
-  if (world.history.length > 120) world.history.shift();
-}
-
 export function step(world) {
   world.tick += 1;
+  world.stats.totalTicks += 1;
+  world.turn = { expReturned: 0, premature: 0 };
+  const healthBefore = world.healthIndex;
+
   updateEnvironment(world);
+  updateChallenge(world);
   sunDecidePolicy(world);
   applyPolicyEffects(world);
+  emitLightAndSeeds(world);
   growProducers(world);
   feedConsumers(world);
   predatorPressure(world);
   decomposeOrganic(world);
-  ageAndProgressStages(world);
+  ageAndProgress(world);
   handleReproduction(world);
   handleDeaths(world);
-  world.healthIndex = computeEcosystemHealth(world);
-  updateSunGrowth(world);
-  recordHistory(world);
+
+  world.healthIndex = computeHealth(world);
+  if (world.healthIndex > world.stats.bestHealth) world.stats.bestHealth = world.healthIndex;
+
+  const reward = world.healthIndex - healthBefore + 0.1 * world.turn.expReturned - 0.4 * world.turn.premature;
+  sunLearn(world, reward);
+  updateSunGrowth(world, reward);
+
+  world.history.push({ tick: world.tick, health: world.healthIndex, population: world.population.length, sunLevel: world.sun.level });
+  if (world.history.length > 120) world.history.shift();
   return world;
 }
 
+// ---------- خروجی برای رابط کاربری ----------
 export function getTreeOfLifeState(world) {
-  return SEPHIROT.map((node) => ({ ...node, lit: node.level <= world.sun.level }));
+  return SEPHIROT.map((n) => ({ ...n, lit: n.level <= world.sun.level }));
 }
-
 export function getCurrentZodiac(world) {
   return ZODIAC[world.zodiacIndex];
 }
-
 export function summarizeEntity(e) {
-  const sp = SPECIES[e.species];
   return {
     id: e.id,
-    species: sp.name,
-    role: sp.role,
+    species: SPECIES[e.species].name,
+    role: e.role,
     stage: STAGE_FA[e.stage],
     age: Math.round(e.age),
     energy: Math.round(e.energy),
     health: Math.round(e.health),
     childCount: e.childCount,
+    gen: e.gen,
+    experience: Math.round(e.experience * 10) / 10,
+    resilience: Math.round(e.resilience * 100),
   };
 }
