@@ -31,11 +31,13 @@
         </select>
       </label>
     </div>
+    <div class="mem-actions cognition-service-controls"><label>آدرس API عامل‌های BrainCog / Hyperon <input id="cognitionEndpoint" type="url" inputmode="url" dir="ltr" placeholder="https://sunp-cognition-api.onrender.com"></label><button id="testCognitionApi" class="secondary">آزمایش اتصال API</button></div>
+    <p id="cognitionServiceStatus" class="hint">API خارجی هنوز آزمایش نشده</p>
     <p><b id="cognitionModeLabel">خورشید + هر دو عامل کمکی</b></p>
     <p id="cognitionSummary" class="cognition-summary">آماده‌سازی سیگنال‌های کمکی…</p>
     <div id="cognitionSignals" class="population"></div>
     <p class="hint">قواعد نمادین Hyperon-مانند: <span id="cognitionRules">در انتظار تحلیل</span></p>
-    <p class="hint">این رابط از نسخه‌های مرورگری سبک‌شده برای پیشنهاد کمکی استفاده می‌کند؛ اجرای واقعی کتابخانه‌های Python BrainCog و Hyperon در مرورگر/Pages انجام نمی‌شود.</p>
+    <p class="hint">حالت‌های BrainCog و Hyperon از API واقعی Render استفاده می‌کنند؛ حالت «خورشید تنها» و منطق اصلی شبیه‌سازی بدون تغییر می‌ماند.</p>
     <div class="mem-actions"><button id="cognitionBenchmark" class="secondary">اجرای مقایسهٔ عملکرد (۳ بذر × ۲۵۰ گام)</button></div>
     <div id="cognitionBenchmarkResult" class="cognition-benchmark" aria-live="polite"></div>
   </section>

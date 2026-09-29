@@ -16,10 +16,12 @@ export function validateProposal(payload) {
     policy,
     source: typeof payload.source === "string" ? payload.source.slice(0, 80) : "external-cognition",
     rationale: typeof payload.rationale === "string" ? payload.rationale.slice(0, 500) : "",
+    provider: typeof payload.provider === "string" ? payload.provider.slice(0, 80) : "",
+    fallback: payload.fallback === true,
   };
 }
 
-export async function requestCognitiveProposal({ observation, state = "calm", endpoint, token, fetchImpl = fetch, timeoutMs = 2500 } = {}) {
+export async function requestCognitiveProposal({ observation, state = "calm", provider, endpoint, token, fetchImpl = fetch, timeoutMs = 2500 } = {}) {
   if (!validateObservation(observation) || !endpoint) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -27,7 +29,7 @@ export async function requestCognitiveProposal({ observation, state = "calm", en
     const response = await fetchImpl(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ version: 1, observation, state }),
+      body: JSON.stringify({ version: 1, observation, state, ...(provider ? { provider } : {}) }),
       signal: controller.signal,
     });
     if (!response.ok) return null;
