@@ -1,41 +1,49 @@
 # SunP Cognitive Adapter (experimental)
 
-This optional adapter keeps the JavaScript simulator authoritative and allows a separate cognitive process to propose one of four existing actions. It is intentionally not enabled by default.
+This optional Python service proposes one of SunP's existing actions. The JavaScript simulation remains authoritative; providers cannot mutate world state. The adapter/provider path is experimental and is not enabled in the live browser UI by default.
 
-## Run the safe baseline service
+## Providers and CI tests
 
-Requires Python 3.8+ and no third-party packages:
+- `baseline` (default): safe deterministic fallback.
+- `braincog`: prototype uses BrainCog LIF neurons with a fixed feature-to-current projection. It is an inference demonstration, **not a trained or biologically complete cognitive model**.
+- `hyperon`: prototype runs explicit MeTTa rules to map a discretized observation condition to an allowed action.
+
+GitHub Actions installs the frameworks and runs provider inference, input/action contract checks, and service routing/fallback checks. A green run verifies these prototypes execute in CI; it does not establish improved ecosystem performance or production readiness.
+
+## Run locally
+
+Python 3.10 recommended. Install only the provider you want to test:
 
 ```sh
-python3 cognition/service.py
+python -m pip install hyperon==0.2.10
+# or: python -m pip install braincog
 ```
 
-It listens on 127.0.0.1:8765. Health: `GET /health`; decision: `POST /decide`.
+Start baseline (default):
+```sh
+python cognition/service.py
+```
+
+Opt in to a provider:
+```sh
+SUNP_COGNITION_PROVIDER=hyperon python cognition/service.py
+# or
+SUNP_COGNITION_PROVIDER=braincog python cognition/service.py
+```
+
+Service listens on 127.0.0.1:8765. Health: `GET /health`; decision: `POST /decide`.
 
 Example request:
 ```json
 {"version":1,"state":"calm","observation":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]}
 ```
 
-For remote hosting, set `SUNP_COGNITION_HOST=0.0.0.0` only behind a firewall/reverse proxy and set `SUNP_COGNITION_TOKEN`. Do not expose an unauthenticated endpoint to the public internet.
+Set `SUNP_COGNITION_TOKEN` when using authentication. Do not expose an unauthenticated endpoint publicly; use a firewall and TLS reverse proxy.
 
-## JavaScript caller
+## JavaScript bridge and limitations
 
-`bridge.js` exports `chooseCognitivePolicy({observation,state,endpoint,token})`. Set endpoint to the service URL plus `/decide`. It validates the 16-value observation, validates the returned action against SunP's allowlist, times out, and returns a safe fallback when the service fails.
+`bridge.js` exports `chooseCognitivePolicy({observation,state,endpoint,token})`. It validates the 16-value observation and allowlisted action, times out, and returns a safe fallback when the service fails. A caller must explicitly pass the returned policy to `step(world,{policyOverride: policy})`; the live UI currently does not call this provider path.
 
-The adapter does not mutate the world. A caller must pass the returned policy to `step(world,{policyOverride: policy})` and keep the simulator's normal reward/learning path. Do not allow an external provider to write arbitrary world state.
-
-## BrainCog and Hyperon provider work
-
-The service currently reports `baseline-seam`; it does **not** import either framework. This makes the transport, validation, timeout, and fallback executable without forcing heavyweight research dependencies into SunP.
-
-- BrainCog provider: install in an isolated Python environment after confirming the selected repository revision and compatible Python/PyTorch versions. Implement a provider that consumes the normalized observation and returns one allowed policy. Begin with a small CPU experiment; do not assume a GPU is required or available.
-- Hyperon provider: add a separate MeTTa knowledge/rule module and invoke it through a pinned, tested Hyperon binding. Map only explicit world facts/rules into the knowledge space; return a proposal, never directly mutate the simulation.
-- Keep each provider optional and selectable via server configuration. Benchmark each against existing SunP PPO and heuristic baselines on identical seeds before enabling it.
-
-## Status / limitations
-
-- No BrainCog or Hyperon dependency is installed by this adapter.
+- GitHub Pages cannot host this Python service persistently.
+- Provider prototypes need benchmarking against SunP PPO and heuristic baselines on identical seeds before considering activation.
 - No claim is made that a human brain or complete cognitive architecture has been implemented.
-- The current endpoint is a runnable integration seam and conservative baseline, not a trained cognition model.
-- Browser GitHub Pages cannot host this Python service; run it locally or on a separate server and connect through a secured API.
