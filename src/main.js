@@ -118,16 +118,6 @@ function renderCognition() {
   $("cognitionRules").textContent = advice.hyperon?.rules?.length ? advice.hyperon.rules.join(" · ") : "قاعده نمادین فعالی گزارش نشده.";
 }
 
-function renderCognition() {
-  const advice = lastAdvice || getCognitiveAdvice(world, cognitionMode);
-  $("cognitionMode").value = cognitionMode;
-  $("cognitionModeLabel").textContent = COGNITION_LABELS[cognitionMode];
-  $("cognitionSummary").textContent = advice.summary || "خورشید تنها تصمیم می‌گیرد.";
-  const scores = advice.policyScores;
-  $("cognitionSignals").innerHTML = scores ? Object.entries(scores).map(([p,v]) => "<span class=\"pill\"><span>"+POLICY_FA[p]+"</span><b>"+Math.round(v*100)+"٪</b></span>").join("") : "<span class=\"hint\">عامل‌های کمکی خاموش‌اند.</span>";
-  $("cognitionRules").textContent = advice.hyperon && advice.hyperon.rules.length ? advice.hyperon.rules.join(" · ") : "قاعده نمادین فعالی گزارش نشده.";
-}
-
 function renderPolicy() {
   $("policy").textContent = `${POLICY_FA[world.sun.policy]} · سطح خورشید ${world.sun.level} (چرخه خرد: ${world.sun.wisdomCycles})`;
   $("sunLevel").textContent = world.sun.level;
