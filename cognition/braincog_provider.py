@@ -25,11 +25,10 @@ def decide(observation):
             out = neuron(current)
             spikes += float(out.detach().sum().item())
         totals.append(spikes)
-    return POLICIES[max(range(4), key=lambda i: totals[i])], totals
+    return POLICIES[max(range(4), key=lambda i: totals[i])]
 
 if __name__ == "__main__":
     obs = [0.0] * 16
-    policy, scores = decide(obs)
-    assert policy in POLICIES and len(scores) == 4
-    assert all(math.isfinite(x) for x in scores)
-    print("BrainCog LIF inference OK:", policy, scores)
+    policy = decide(obs)
+    assert policy in POLICIES
+    print("BrainCog LIF inference OK:", policy)
