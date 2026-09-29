@@ -226,7 +226,31 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
+function runCognitionBenchmark() {
+  const button = $("cognitionBenchmark"), output = $("cognitionBenchmarkResult");
+  button.disabled = true; output.textContent = "در حال مقایسه؛ جهان زنده فعلی تغییر نمی‌کند…";
+  setTimeout(() => {
+    try {
+      const modes = ["off", "braincog", "hyperon", "both"], seeds = [101,202,303], ticks = 250;
+      const rows = modes.map(mode => {
+        const runs = seeds.map(seed => {
+          const w = createWorld(seed); let health=0, population=0, richness=0, alive=0;
+          for(let i=0;i<ticks;i++){ const advice=getCognitiveAdvice(w,mode); step(w,{cognitiveAdvice:advice}); health+=w.healthIndex; population+=w.population.length; richness+=new Set(w.population.map(e=>e.species)).size; if(w.population.length)alive++; }
+          return {health:health/ticks,population:population/ticks,richness:richness/ticks,alive:alive/ticks};
+        });
+        const avg=k=>runs.reduce((s,r)=>s+r[k],0)/runs.length;
+        return {mode,health:avg("health"),population:avg("population"),richness:avg("richness"),alive:avg("alive")};
+      });
+      const header="<p class=\"hint\">۳ بذر یکسان برای هر حالت · هر اجرا ۲۵۰ گام · PPO در همه حالت‌ها فعال است.</p>";
+      const rowsHtml=rows.map(r=>"<tr><td>"+COGNITION_LABELS[r.mode]+"</td><td>"+r.health.toFixed(1)+"</td><td>"+r.population.toFixed(1)+"</td><td>"+r.richness.toFixed(1)+"</td><td>"+(r.alive*100).toFixed(0)+"٪</td></tr>").join("");
+      output.innerHTML=header+"<div class=\"benchmark-table\"><table><thead><tr><th>حالت</th><th>سلامت میانگین</th><th>جمعیت</th><th>تنوع</th><th>بقای جمعیت</th></tr></thead><tbody>"+rowsHtml+"</tbody></table></div><p class=\"hint\">آزمون مرورگری مدل نمادین با سیگنال‌های سبک‌شده است؛ اجرای واقعی پکیج‌های Python نیست و به‌تنهایی اثبات برتری محسوب نمی‌شود.</p>";
+    } catch(error) { output.textContent="مقایسه ناموفق: "+error.message; }
+    finally { button.disabled=false; }
+  },30);
+}
+
 function bindControls() {
+  $("cognitionBenchmark").addEventListener("click", runCognitionBenchmark);
   $("toggle").addEventListener("click", () => { running = !running; scheduleLoop(); });
   $("step").addEventListener("click", () => { running = false; scheduleLoop(); doStep(); });
   $("reset").addEventListener("click", async () => {
