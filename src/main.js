@@ -222,21 +222,25 @@ async function doStep() {
   cognitionRequestInFlight = true;
   try {
     lastAdvice = getCognitiveAdvice(world, cognitionMode);
-    if (cognitionMode !== "off") {
+    if (cognitionMode === "braincog" || cognitionMode === "hyperon" || cognitionMode === "both") {
       const endpoint = (localStorage.getItem(COGNITION_ENDPOINT_KEY) || DEFAULT_COGNITION_ENDPOINT).replace(/\/+$/, "");
-      const proposal = await requestCognitiveProposal({
+      const providers = cognitionMode === "both" ? ["braincog", "hyperon"] : [cognitionMode];
+      const proposals = await Promise.all(providers.map(provider => requestCognitiveProposal({
         observation: getSunObservation(world),
         state: world.challenge ? world.challenge.type : "calm",
+        provider,
         endpoint: endpoint + "/decide",
         timeoutMs: 1800,
-      });
-      if (proposal) {
+      })));
+      const valid = proposals.filter(Boolean);
+      if (valid.length) {
         const scores = { ...(lastAdvice.policyScores || { repair: 0, conserve: 0, balance: 0, diversity: 0 }) };
-        scores[proposal.policy] = Math.min(1, (scores[proposal.policy] || 0) + 0.3);
-        lastAdvice = { ...lastAdvice, policyScores: scores, external: proposal,
-          summary: [lastAdvice.summary, "API واقعی پیشنهاد " + (POLICY_FA[proposal.policy] || proposal.policy)].filter(Boolean).join(" · ") };
-        externalCognitionStatus = "پاسخ API دریافت شد: " + (proposal.provider || proposal.source || "فعال");
-      } else externalCognitionStatus = "API پاسخ معتبر نداد؛ عامل‌های محلی و PPO ادامه دارند.";
+        for (const proposal of valid) scores[proposal.policy] = Math.min(1, (scores[proposal.policy] || 0) + 0.3);
+        const names = valid.map(p => p.provider || p.source).join(" + ");
+        lastAdvice = { ...lastAdvice, policyScores: scores, external: { ...valid[0], provider: names },
+          summary: [lastAdvice.summary, "پیشنهاد API واقعی: " + valid.map(p => POLICY_FA[p.policy] || p.policy).join("، ")].filter(Boolean).join(" · ") };
+        externalCognitionStatus = "پاسخ API دریافت شد: " + names;
+      } else externalCognitionStatus = "API عامل انتخاب‌شده پاسخ نداد؛ پیشنهاد محلی و PPO ادامه دارند.";
     } else externalCognitionStatus = "حالت خورشید تنها است؛ درخواست API ارسال نمی‌شود.";
     step(world, { cognitiveAdvice: lastAdvice });
     renderAll();
