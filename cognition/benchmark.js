@@ -3,7 +3,9 @@ import { createWorld, step, getSunObservation, SUN_POLICIES } from "../src/simul
 const seeds = (process.env.SUNP_BENCH_SEEDS || "101,202,303").split(",").map(Number);
 const ticks = Number(process.env.SUNP_BENCH_TICKS || 120);
 const endpoint = process.env.SUNP_COGNITION_ENDPOINT || "http://127.0.0.1:8765/decide";
-const modes = ["ppo", "braincog", "hyperon"];
+const cognitiveMode = process.env.SUNP_COGNITION_PROVIDER || "braincog";
+if (!["braincog", "hyperon"].includes(cognitiveMode)) throw new Error("SUNP_COGNITION_PROVIDER must be braincog or hyperon");
+const modes = ["ppo", cognitiveMode];
 
 async function externalPolicy(world) {
   const response = await fetch(endpoint, {
