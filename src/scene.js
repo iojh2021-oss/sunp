@@ -12,6 +12,19 @@ const ICONS = {
   aquatic: "🐟",
   predator: "🐺",
   fungus: "🍄",
+  // ۱۲ موجود زودیاک
+  aries: "🐏",
+  taurus: "🐂",
+  gemini: "👯",
+  cancer: "🦀",
+  leo: "🦁",
+  virgo: { seed: "🌾", sprout: "🌱", immature: "🌿", mature: "🌾", fruiting: "🌾", aging: "🥀", returning: "🍂" },
+  libra: "⚖️",
+  scorpio: "🦂",
+  sagittarius: "🏹",
+  capricorn: "🐐",
+  aquarius: "🏺",
+  pisces: "🐟",
 };
 const hitboxesByWorld = new WeakMap();
 

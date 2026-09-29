@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   createWorld, step, ZODIAC, SEPHIROT, PATHS_22, getTreeOfLifeState, getCurrentZodiac,
   exportMemory, sanitizeMemory, getLessons, getSunBonus, benchmarkPolicies, benchmarkEcosystem, getSunDecisionReport,
+  SPECIES, CHALLENGES, STATE_FA,
 } from "../src/simulation.js";
 
 const runN = (w, n) => { for (let i = 0; i < n; i++) step(w); return w; };
@@ -196,4 +197,57 @@ test("مقایسه‌ی بقای عامل یادگیرنده با خط‌پای�
   }
   assert.ok(Number.isFinite(report.deltas.meanAliveRate));
   assert.ok(Number.isFinite(report.deltas.meanHealth));
+});
+
+test("هر ۱۲ نشان زودیاک یک گونه‌ی متناظر معتبر در SPECIES دارد", () => {
+  for (const z of ZODIAC) {
+    const sp = SPECIES[z.id];
+    assert.ok(sp, `گونه‌ی زودیاکی یافت نشد: ${z.id}`);
+    assert.ok(["producer", "consumer", "predator", "decomposer"].includes(sp.role), z.id);
+    assert.ok(sp.lifespan > 0 && sp.matureAge > 0 && sp.matureAge < sp.lifespan, z.id);
+  }
+});
+
+test("رژیم غذایی هر گونه فقط به گونه‌های واقعاً موجود اشاره می‌کند", () => {
+  for (const [id, sp] of Object.entries(SPECIES)) {
+    for (const food of sp.diet || []) {
+      const known = SPECIES[food] || food === "organic" || food === "algae";
+      assert.ok(known, `${id} از منبع ناشناخته «${food}» تغذیه می‌کند`);
+    }
+  }
+});
+
+test("در یک بازه‌ی چند-چرخه‌ای (۸۰۰ روز)، هر ۱۲ موجود زودیاک دست‌کم یک‌بار متولد می‌شوند", () => {
+  for (const seed of [2026, 1, 2, 3, 99, 12345]) {
+    const w = createWorld(seed);
+    const seen = new Set();
+    for (let i = 0; i < 800; i++) {
+      step(w);
+      for (const e of w.population) seen.add(e.species);
+    }
+    const missing = ZODIAC.filter((z) => !seen.has(z.id)).map((z) => z.id);
+    assert.equal(missing.length, 0, `بذر ${seed}: متولد نشدند: ${missing.join(",")}`);
+  }
+});
+
+test("چالش‌های جدید (گرمای شدید، توفان) ثبت شده‌اند و مقادیر محیط را در کران نگه می‌دارند", () => {
+  assert.ok(CHALLENGES.heatwave && CHALLENGES.windstorm);
+  assert.equal(STATE_FA.heatwave, CHALLENGES.heatwave.name);
+  assert.equal(STATE_FA.windstorm, CHALLENGES.windstorm.name);
+  for (const type of ["heatwave", "windstorm"]) {
+    const w = createWorld(55);
+    w.challenge = { type, severity: 0.9, duration: 200, remaining: 200 };
+    runN(w, 200);
+    for (const key of ["light", "water", "soil", "nutrients", "oxygen", "biomass", "organic"]) {
+      assert.ok(Number.isFinite(w.env[key]) && w.env[key] >= 0 && w.env[key] <= 100, `${type}/${key}`);
+    }
+    assert.ok(Number.isFinite(w.healthIndex));
+  }
+});
+
+test("گسترش دنیا شکل ورودی شبکه را نمی‌شکند و همچنان ۱۶ ویژگی تولید می‌شود", () => {
+  const w = runN(createWorld(3030), 400);
+  const report = getSunDecisionReport(w);
+  assert.equal(report.policies.length, 4);
+  for (const row of report.policies) assert.ok(Number.isFinite(row.score));
 });

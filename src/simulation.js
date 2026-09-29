@@ -78,6 +78,19 @@ export const SPECIES = {
   aquatic: { role: "consumer", diet: ["organic", "algae"], name: "آبزی", lifespan: 180, matureAge: 25 },
   predator: { role: "predator", diet: ["herbivore", "pollinator", "aquatic"], name: "شکارچی", lifespan: 260, matureAge: 45 },
   fungus: { role: "decomposer", name: "قارچ", lifespan: 110, matureAge: 15 },
+  // ---- ۱۲ موجود زودیاک: با رسیدن خورشید به هر نشان، از نور همان نشان متولد می‌شوند ----
+  aries: { role: "consumer", diet: ["tree", "flower"], name: "قوچ", zodiac: "حمل", lifespan: 220, matureAge: 32 },
+  taurus: { role: "consumer", diet: ["tree", "flower"], name: "گاو", zodiac: "ثور", lifespan: 260, matureAge: 38 },
+  gemini: { role: "consumer", diet: ["flower"], name: "دوقلوها", zodiac: "جوزا", lifespan: 90, matureAge: 12 },
+  cancer: { role: "consumer", diet: ["organic", "algae"], name: "خرچنگ", zodiac: "سرطان", lifespan: 170, matureAge: 24 },
+  leo: { role: "predator", diet: ["herbivore", "pollinator", "aquatic", "aries", "taurus"], name: "شیر", zodiac: "اسد", lifespan: 280, matureAge: 48 },
+  virgo: { role: "producer", name: "خوشه گندم", zodiac: "سنبله", lifespan: 130, matureAge: 18 },
+  libra: { role: "decomposer", name: "ترازو", zodiac: "میزان", lifespan: 120, matureAge: 16 },
+  scorpio: { role: "predator", diet: ["herbivore", "pollinator", "gemini", "cancer"], name: "کژدم", zodiac: "عقرب", lifespan: 240, matureAge: 40 },
+  sagittarius: { role: "predator", diet: ["herbivore", "aries", "taurus", "capricorn"], name: "کمانگیر", zodiac: "قوس", lifespan: 250, matureAge: 42 },
+  capricorn: { role: "consumer", diet: ["tree", "flower", "virgo"], name: "بز کوهی", zodiac: "جدی", lifespan: 210, matureAge: 30 },
+  aquarius: { role: "consumer", diet: ["organic", "algae"], name: "آبریز", zodiac: "دلو", lifespan: 190, matureAge: 26 },
+  pisces: { role: "consumer", diet: ["organic", "algae"], name: "ماهی", zodiac: "حوت", lifespan: 160, matureAge: 20 },
 };
 export const LIFE_STAGES = ["seed", "sprout", "immature", "mature", "fruiting", "aging", "returning"];
 export const STAGE_FA = {
@@ -99,13 +112,12 @@ export const CHALLENGES = {
   cold: { name: "سرمای شدید", prior: "repair" },
   blight: { name: "بیماری گیاهی", prior: "diversity" },
   flood: { name: "سیل", prior: "balance" },
+  heatwave: { name: "گرمای شدید", prior: "conserve" },
+  windstorm: { name: "توفان", prior: "balance" },
 };
 export const STATE_FA = {
   calm: "آرامش",
-  drought: CHALLENGES.drought.name,
-  cold: CHALLENGES.cold.name,
-  blight: CHALLENGES.blight.name,
-  flood: CHALLENGES.flood.name,
+  ...Object.fromEntries(Object.entries(CHALLENGES).map(([key, c]) => [key, c.name])),
 };
 const STATE_KEYS = ["calm", ...Object.keys(CHALLENGES)];
 
@@ -213,10 +225,12 @@ function freshNetwork(){
 function neuralFeatures(world){
  const e=world.env,c=world.challenge,p=world.population;
  const counts={};for(const x of p)counts[x.species]=(counts[x.species]||0)+1;
+ // بر پایه‌ی نقش (نه اسم گونه) شمرده می‌شود تا موجودات تازه (مثل ۱۲ موجود زودیاک) هم خودشان را در ورودی شبکه نشان دهند.
+ const nonPredatorConsumers=p.filter(x=>x.role==="consumer").length;
  const norm=v=>Math.max(-1,Math.min(1,v*2-1));
  return [e.light/100,(e.temp+20)/80,e.water/100,e.soil/100,e.nutrients/100,e.oxygen/100,e.biomass/100,e.organic/100,
   world.healthIndex/100,Math.min(1,p.length/world.populationCap),Math.min(1,(counts.tree||0)/10),Math.min(1,(counts.flower||0)/10),
-  Math.min(1,((counts.herbivore||0)+(counts.pollinator||0)+(counts.aquatic||0))/20),c?1:0,c?c.severity:0,world.sun.level/10].map(norm);
+  Math.min(1,nonPredatorConsumers/20),c?1:0,c?c.severity:0,world.sun.level/10].map(norm);
 }
 function neuralForward(net,x){
  const activations=[x.slice()];
@@ -375,7 +389,7 @@ export function createWorld(seed = 20260101, memory = null) {
     env: { light: 60, temp: 20, water: 55, soil: 60, nutrients: 50, oxygen: 55, biomass: 45, organic: 15 },
     lightParticles: 0,
     population: [],
-    populationCap: 42,
+    populationCap: 60,
     challenge: null,
     sun: defaultSun(),
     stats: defaultStats(),
@@ -403,9 +417,26 @@ function logEvent(world, text) {
 }
 
 // ---------- محیط و زودیاک ----------
+// فرا رسیدن هر نشان زودیاک، یک موجود همان نشان را از نور خورشید متولد می‌کند (اگر ظرفیت و نور کافی باشد).
+function spawnZodiacCreature(world) {
+  const sign = ZODIAC[world.zodiacIndex];
+  const sp = SPECIES[sign.id];
+  if (!sp) return;
+  // این تولد نمادین است (فرارسیدن یک نشان)، پس کمی فراتر از سقف معمول جمعیت هم مجاز است؛ مثل بقیه‌ی موجودات با کمبود انرژی/سلامت طبیعی می‌میرد.
+  if (world.population.length >= world.populationCap + 6) return;
+  if (world.lightParticles < 6) return;
+  world.lightParticles = clamp(world.lightParticles - 6, 0, 60);
+  world.population.push(makeEntity(world, sign.id));
+  logEvent(world, `فرارسیدن ${sign.name} ${sign.symbol}: ${sp.name} از نور خورشید متولد شد.`);
+}
+
+
 function updateEnvironment(world) {
   world.day += 1;
-  if (world.day % DAYS_PER_SIGN === 0) world.zodiacIndex = (world.zodiacIndex + 1) % ZODIAC.length;
+  if (world.day % DAYS_PER_SIGN === 0) {
+    world.zodiacIndex = (world.zodiacIndex + 1) % ZODIAC.length;
+    spawnZodiacCreature(world);
+  }
   const angle = (world.zodiacIndex / ZODIAC.length) * Math.PI * 2;
   const warmth = Math.cos(angle - Math.PI);
   const env = world.env;
@@ -459,14 +490,24 @@ function applyChallengeEffects(world, c) {
   } else if (c.type === "flood") {
     env.soil = clamp(env.soil - 1.4 * sev);
     env.oxygen = clamp(env.oxygen - 0.8 * sev);
+  } else if (c.type === "heatwave") {
+    env.temp += 14 * sev;
+    env.water = clamp(env.water - 2.0 * sev);
+    env.light = clamp(env.light + 6 * sev);
+  } else if (c.type === "windstorm") {
+    env.biomass = clamp(env.biomass - 1.6 * sev);
+    env.organic = clamp(env.organic + 0.8 * sev);
   }
+  const isAquaticLike = (e) => e.species === "aquatic" || (SPECIES[e.species].diet || []).includes("algae");
   for (const e of world.population) {
     let dmg = 0;
     const producer = e.role === "producer";
-    if (c.type === "drought") dmg = producer || e.species === "aquatic" ? 2.6 : 0.8;
+    if (c.type === "drought") dmg = producer || isAquaticLike(e) ? 2.6 : 0.8;
     else if (c.type === "cold") dmg = e.role === "decomposer" ? 0.3 : e.role === "producer" ? 1.0 : 2.0;
     else if (c.type === "blight") dmg = producer ? 3.0 : e.role === "decomposer" ? 0 : 0.3;
-    else if (c.type === "flood") dmg = e.species === "aquatic" ? 0 : e.role === "producer" ? 1.0 : 1.8;
+    else if (c.type === "flood") dmg = isAquaticLike(e) ? 0 : e.role === "producer" ? 1.0 : 1.8;
+    else if (c.type === "heatwave") dmg = producer ? 2.2 : isAquaticLike(e) ? 2.8 : 1.2;
+    else if (c.type === "windstorm") dmg = e.role === "predator" ? 0.6 : producer ? 1.4 : 1.0;
     dmg *= sev * (1 - 0.7 * e.resilience);
     if (dmg > 0) {
       e.health = clamp(e.health - dmg);
@@ -573,7 +614,9 @@ function ecosystemObjective(world) {
  const richness=Object.keys(counts).length/Math.max(1,Object.keys(SPECIES).length);
  const resource=[e.water,e.soil,e.nutrients,e.oxygen,e.biomass].reduce((a,v)=>a+v,0)/500;
  const health=p.length?p.reduce((a,x)=>a+x.health,0)/p.length/100:0;
- const roleBalance=clamp(100-Math.abs((counts.tree||0)+(counts.flower||0)-(counts.herbivore||0)-(counts.pollinator||0)-(counts.aquatic||0))*2,0,100)/100;
+ let producers=0,nonPredConsumers=0;
+ for(const x of p){const role=SPECIES[x.species].role;if(role==="producer")producers++;else if(role==="consumer")nonPredConsumers++;}
+ const roleBalance=clamp(100-Math.abs(producers-nonPredConsumers)*2,0,100)/100;
  const diversity=richness;
  return .35*health+.25*resource+.2*diversity+.2*roleBalance;
 }
