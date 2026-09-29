@@ -232,6 +232,9 @@ function neuralFeatures(world){
   world.healthIndex/100,Math.min(1,p.length/world.populationCap),Math.min(1,(counts.tree||0)/10),Math.min(1,(counts.flower||0)/10),
   Math.min(1,nonPredatorConsumers/20),c?1:0,c?c.severity:0,world.sun.level/10].map(norm);
 }
+// Read-only normalized observation contract shared with the optional Python agents.
+export function getSunObservation(world) { return neuralFeatures(world).slice(); }
+
 function neuralForward(net,x){
  const activations=[x.slice()];
  for(let l=0;l<net.layers.length;l++){
