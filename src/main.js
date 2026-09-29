@@ -4,6 +4,7 @@ import {
   PATHS_22, PILLARS, POLICY_FA, STAGE_FA, SPECIES, CHALLENGES,
 } from "./simulation.js";
 import { initScene, renderScene, hitTestEntity, speciesLabel } from "./scene.js";
+import { getCognitiveAdvice, COGNITION_MODES, COGNITION_LABELS } from "./cognition.js";
 
 const BASE_SEED = 20260101;
 const LOCAL_KEY = "sunp-memory-v1";
@@ -16,6 +17,8 @@ let speed = 1;
 let timer = null;
 let storageMode = "local"; // "server" | "local"
 let saveStatus = "—";
+let cognitionMode = "both";
+let lastAdvice = null;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("world");
@@ -102,6 +105,17 @@ function renderPopulation() {
   for (const e of world.population) sc[e.species] = (sc[e.species] || 0) + 1;
   $("species").innerHTML = Object.keys(SPECIES)
     .map((s) => `<div class="pill"><span>${speciesLabel(s)}</span><b>${sc[s] || 0}</b></div>`).join("");
+}
+
+function renderCognition() {
+  const modeSelect = $("cognitionMode");
+  if (modeSelect && modeSelect.value !== cognitionMode) modeSelect.value = cognitionMode;
+  const advice = lastAdvice || getCognitiveAdvice(world, cognitionMode);
+  $("cognitionSummary").textContent = advice.summary || "خورشید تنها تصمیم می‌گیرد.";
+  $("cognitionModeLabel").textContent = COGNITION_LABELS[cognitionMode] || cognitionMode;
+  const scores = advice.policyScores;
+  $("cognitionSignals").innerHTML = scores ? Object.entries(scores).map(([p,v]) => `<span class="pill"><span>${POLICY_FA[p]}</span><b>${Math.round(v*100)}٪</b></span>`).join("") : "<span class=\"hint\">عامل‌های کمکی خاموش‌اند.</span>";
+  $("cognitionRules").textContent = advice.hyperon?.rules?.length ? advice.hyperon.rules.join(" · ") : "قاعده نمادین فعالی گزارش نشده.";
 }
 
 function renderPolicy() {
