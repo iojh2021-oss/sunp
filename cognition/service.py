@@ -104,7 +104,10 @@ class Handler(BaseHTTPRequestHandler):
             obs = data.get("observation")
             if data.get("version") != 1 or not validate_observation(obs):
                 return self.send_json(400, {"error": "invalid observation"})
-            return self.send_json(200, decide(obs))
+            requested_provider = data.get("provider")
+            if requested_provider is not None and requested_provider not in {"braincog", "hyperon"}:
+                return self.send_json(400, {"error": "provider must be braincog or hyperon"})
+            return self.send_json(200, decide(obs, requested_provider))
         except (ValueError, TypeError, json.JSONDecodeError):
             return self.send_json(400, {"error": "bad json"})
 
