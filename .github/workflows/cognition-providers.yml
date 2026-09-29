@@ -1,0 +1,51 @@
+name: Cognitive providers isolated smoke tests
+
+on:
+  pull_request:
+    paths:
+      - "cognition/**"
+      - ".github/workflows/cognition-providers.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  adapter-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: node cognition/test-bridge.js
+      - run: python -m py_compile cognition/service.py
+
+  hyperon-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install hyperon==0.2.10
+      - name: Verify Hyperon Python binding
+        run: python -c "import hyperon; print('Hyperon import OK')"
+      - name: Verify MeTTa CLI
+        run: metta --help
+
+  braincog-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install braincog
+      - name: Verify BrainCog import
+        run: python -c "import braincog; print('BrainCog import OK')"
