@@ -586,7 +586,7 @@ export function getSunDecisionReport(world) {
   const ranked=evaluatePolicies(world,features,vals,visits).sort((a,b)=>b.decisionScore-a.decisionScore);
   return {state:key,selected:ranked[0]?.policy||"balance",policies:ranked.map(({policy,score,rollout,learned,tabular,recalled,confidence,exploration,visits})=>({policy,score,rollout,learned,tabular,recalled,confidence,exploration,visits}))};
 }
-function sunDecidePolicy(world, policyOverride=null) {
+function sunDecidePolicy(world, policyOverride=null, cognitiveAdvice=null) {
   const sun=world.sun,key=world.challenge?world.challenge.type:"calm";
   const vals=ensureState(sun,key),eps=Math.max(.025,.2-.012*sun.level-.01*sun.wisdomCycles);
   const features=neuralFeatures(world);
@@ -597,7 +597,7 @@ function sunDecidePolicy(world, policyOverride=null) {
   if(policyOverride && SUN_POLICIES.includes(policyOverride))action=SUN_POLICIES.indexOf(policyOverride);
   else if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);
   else {
-    const scores=trainedLogits ?? qValues;
+    const scores=(trainedLogits ?? qValues).map((value,i)=>value + (cognitiveAdvice?.policyScores ? 0.12 * (cognitiveAdvice.policyScores[SUN_POLICIES[i]] || 0) : 0));
     let best=-Infinity;
     for(let i=0;i<scores.length;i++)if(scores[i]>best){best=scores[i];action=i}
   }
@@ -889,7 +889,7 @@ export function step(world, options = {}) {
 
   updateEnvironment(world);
   updateChallenge(world);
-  sunDecidePolicy(world, options.policyOverride || null);
+  sunDecidePolicy(world, options.policyOverride || null, options.cognitiveAdvice || null);
   applyPolicyEffects(world);
   emitLightAndSeeds(world);
   growProducers(world);

@@ -4,6 +4,7 @@ import {
   PATHS_22, PILLARS, POLICY_FA, STAGE_FA, SPECIES, CHALLENGES,
 } from "./simulation.js";
 import { initScene, renderScene, hitTestEntity, speciesLabel } from "./scene.js";
+import { getCognitiveAdvice, COGNITION_MODES, COGNITION_LABELS } from "./cognition.js";
 
 const BASE_SEED = 20260101;
 const LOCAL_KEY = "sunp-memory-v1";
@@ -16,6 +17,8 @@ let speed = 1;
 let timer = null;
 let storageMode = "local"; // "server" | "local"
 let saveStatus = "—";
+let cognitionMode = "both";
+let lastAdvice = null;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("world");
@@ -104,6 +107,17 @@ function renderPopulation() {
     .map((s) => `<div class="pill"><span>${speciesLabel(s)}</span><b>${sc[s] || 0}</b></div>`).join("");
 }
 
+function renderCognition() {
+  const modeSelect = $("cognitionMode");
+  if (modeSelect && modeSelect.value !== cognitionMode) modeSelect.value = cognitionMode;
+  const advice = lastAdvice || getCognitiveAdvice(world, cognitionMode);
+  $("cognitionSummary").textContent = advice.summary || "خورشید تنها تصمیم می‌گیرد.";
+  $("cognitionModeLabel").textContent = COGNITION_LABELS[cognitionMode] || cognitionMode;
+  const scores = advice.policyScores;
+  $("cognitionSignals").innerHTML = scores ? Object.entries(scores).map(([p,v]) => `<span class="pill"><span>${POLICY_FA[p]}</span><b>${Math.round(v*100)}٪</b></span>`).join("") : "<span class=\"hint\">عامل‌های کمکی خاموش‌اند.</span>";
+  $("cognitionRules").textContent = advice.hyperon?.rules?.length ? advice.hyperon.rules.join(" · ") : "قاعده نمادین فعالی گزارش نشده.";
+}
+
 function renderPolicy() {
   $("policy").textContent = `${POLICY_FA[world.sun.policy]} · سطح خورشید ${world.sun.level} (چرخه خرد: ${world.sun.wisdomCycles})`;
   $("sunLevel").textContent = world.sun.level;
@@ -188,6 +202,7 @@ function renderAll() {
   renderStats();
   renderPopulation();
   renderPolicy();
+  renderCognition();
   renderHistory();
   renderMemory();
   renderTreeOfLife();
@@ -196,7 +211,8 @@ function renderAll() {
 
 // ---------- حلقه شبیه‌سازی ----------
 function doStep() {
-  step(world);
+  lastAdvice = getCognitiveAdvice(world, cognitionMode);
+  step(world, { cognitiveAdvice: lastAdvice });
   renderAll();
   if (world.tick % SAVE_EVERY === 0) persist();
 }
@@ -212,7 +228,32 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
+function runCognitionBenchmark() {
+  const button = $("cognitionBenchmark"), output = $("cognitionBenchmarkResult");
+  button.disabled = true; output.textContent = "در حال مقایسه؛ جهان زنده فعلی تغییر نمی‌کند…";
+  setTimeout(() => {
+    try {
+      const modes = ["off", "braincog", "hyperon", "both"], seeds = [101,202,303], ticks = 250;
+      const rows = modes.map(mode => {
+        const runs = seeds.map(seed => {
+          const w = createWorld(seed); let health=0, population=0, richness=0, alive=0;
+          for(let i=0;i<ticks;i++){ const advice=getCognitiveAdvice(w,mode); step(w,{cognitiveAdvice:advice}); health+=w.healthIndex; population+=w.population.length; richness+=new Set(w.population.map(e=>e.species)).size; if(w.population.length)alive++; }
+          return {health:health/ticks,population:population/ticks,richness:richness/ticks,alive:alive/ticks};
+        });
+        const avg=k=>runs.reduce((s,r)=>s+r[k],0)/runs.length;
+        return {mode,health:avg("health"),population:avg("population"),richness:avg("richness"),alive:avg("alive")};
+      });
+      const header="<p class=\"hint\">۳ بذر یکسان برای هر حالت · هر اجرا ۲۵۰ گام · PPO در همه حالت‌ها فعال است.</p>";
+      const rowsHtml=rows.map(r=>"<tr><td>"+COGNITION_LABELS[r.mode]+"</td><td>"+r.health.toFixed(1)+"</td><td>"+r.population.toFixed(1)+"</td><td>"+r.richness.toFixed(1)+"</td><td>"+(r.alive*100).toFixed(0)+"٪</td></tr>").join("");
+      output.innerHTML=header+"<div class=\"benchmark-table\"><table><thead><tr><th>حالت</th><th>سلامت میانگین</th><th>جمعیت</th><th>تنوع</th><th>بقای جمعیت</th></tr></thead><tbody>"+rowsHtml+"</tbody></table></div><p class=\"hint\">آزمون مرورگری مدل نمادین با سیگنال‌های سبک‌شده است؛ اجرای واقعی پکیج‌های Python نیست و به‌تنهایی اثبات برتری محسوب نمی‌شود.</p>";
+    } catch(error) { output.textContent="مقایسه ناموفق: "+error.message; }
+    finally { button.disabled=false; }
+  },30);
+}
+
 function bindControls() {
+  $("cognitionMode").addEventListener("change", () => { cognitionMode = $("cognitionMode").value; lastAdvice = getCognitiveAdvice(world, cognitionMode); renderCognition(); });
+  $("cognitionBenchmark").addEventListener("click", runCognitionBenchmark);
   $("toggle").addEventListener("click", () => { running = !running; scheduleLoop(); });
   $("step").addEventListener("click", () => { running = false; scheduleLoop(); doStep(); });
   $("reset").addEventListener("click", async () => {
