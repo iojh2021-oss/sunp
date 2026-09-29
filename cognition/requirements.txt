@@ -1,2 +1,3 @@
-# Baseline cognition API uses only Python standard library.
-# Optional BrainCog and Hyperon providers are installed separately when enabled.
+# Runtime dependencies for real BrainCog and Hyperon provider modes.
+braincog
+hyperon==0.2.10
