@@ -144,3 +144,5 @@ button.danger { color: var(--red); border-color: var(--red); }
 
 /* Advisory cognition UI */
 .cognition-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}.cognition-head h2{margin:0}.cognition-head select{background:#07122e;color:var(--text);border:1px solid var(--gold);border-radius:8px;padding:8px;max-width:100%}.cognition-summary{color:var(--gold);font-size:.9rem}.cognition-panel .population{margin:8px 0}
+
+.cognition-benchmark{overflow-x:auto}.benchmark-table table{width:100%;border-collapse:collapse;font-size:.82rem}.benchmark-table th,.benchmark-table td{padding:7px;border-bottom:1px solid var(--panel-border);text-align:center}.benchmark-table th{color:var(--gold)}button:disabled{opacity:.55;cursor:wait}
