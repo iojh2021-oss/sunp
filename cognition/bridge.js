@@ -16,6 +16,8 @@ export function validateProposal(payload) {
     policy,
     source: typeof payload.source === "string" ? payload.source.slice(0, 80) : "external-cognition",
     rationale: typeof payload.rationale === "string" ? payload.rationale.slice(0, 500) : "",
+    provider: typeof payload.provider === "string" ? payload.provider.slice(0, 80) : "",
+    fallback: payload.fallback === true,
   };
 }
 
