@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: "3.10"
       - run: node cognition/test-bridge.js
-      - run: python -m py_compile cognition/service.py
+      - run: python -m py_compile cognition/service.py cognition/braincog_provider.py cognition/hyperon_provider.py cognition/test_providers.py
 
   hyperon-smoke:
     runs-on: ubuntu-latest
@@ -37,6 +37,8 @@ jobs:
         run: python -c "import hyperon; print('Hyperon import OK')"
       - name: Verify MeTTa CLI
         run: metta --help
+      - name: Run actual MeTTa decision rules
+        run: python cognition/hyperon_provider.py
 
   braincog-smoke:
     runs-on: ubuntu-latest
@@ -49,3 +51,17 @@ jobs:
       - run: python -m pip install braincog
       - name: Verify BrainCog import
         run: python -c "import braincog; print('BrainCog import OK')"
+      - name: Run BrainCog LIF inference
+        run: python cognition/braincog_provider.py
+
+  provider-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install braincog hyperon==0.2.10
+      - name: Check provider action and observation contracts
+        run: python cognition/test_providers.py
