@@ -19,6 +19,29 @@
 
   <section class="stats" id="stats" aria-live="polite"></section>
 
+  <section class="panel cognition-panel" aria-live="polite">
+    <div class="cognition-head">
+      <div><h2>عامل‌های کمکی خورشید</h2><p class="hint">BrainCog و Hyperon فقط سیگنال و تحلیل می‌دهند؛ انتخاب و اجرای سیاست همچنان با خورشید و یادگیری داخلی آن است.</p></div>
+      <label>حالت همکاری
+        <select id="cognitionMode">
+          <option value="off">خورشید تنها</option>
+          <option value="braincog">خورشید + BrainCog</option>
+          <option value="hyperon">خورشید + Hyperon</option>
+          <option value="both" selected>خورشید + هر دو عامل کمکی</option>
+        </select>
+      </label>
+    </div>
+    <div class="mem-actions cognition-service-controls"><label>آدرس API عامل‌های BrainCog / Hyperon <input id="cognitionEndpoint" type="url" inputmode="url" dir="ltr" placeholder="https://sunp-cognition-api.onrender.com"></label><button id="testCognitionApi" class="secondary">آزمایش اتصال API</button></div>
+    <p id="cognitionServiceStatus" class="hint">API خارجی هنوز آزمایش نشده</p>
+    <p><b id="cognitionModeLabel">خورشید + هر دو عامل کمکی</b></p>
+    <p id="cognitionSummary" class="cognition-summary">آماده‌سازی سیگنال‌های کمکی…</p>
+    <div id="cognitionSignals" class="population"></div>
+    <p class="hint">قواعد نمادین Hyperon-مانند: <span id="cognitionRules">در انتظار تحلیل</span></p>
+    <p class="hint">حالت‌های BrainCog و Hyperon از API واقعی Render استفاده می‌کنند؛ حالت «خورشید تنها» و منطق اصلی شبیه‌سازی بدون تغییر می‌ماند.</p>
+    <div class="mem-actions"><button id="cognitionBenchmark" class="secondary">اجرای مقایسهٔ عملکرد (۳ بذر × ۲۵۰ گام)</button></div>
+    <div id="cognitionBenchmarkResult" class="cognition-benchmark" aria-live="polite"></div>
+  </section>
+
   <section class="panel world-panel">
     <div class="world-head">
       <div><h2>جهان زنده اکوسیستم</h2><p>موجودات را انتخاب کن تا وضعیتشان را ببینی.</p></div>

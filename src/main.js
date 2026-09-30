@@ -1,9 +1,11 @@
 // src/main.js — داشبورد و کنترل‌ها + حافظه‌ی ماندگار خورشید (سرور در صورت وجود، وگرنه مرورگر).
 import {
   createWorld, step, exportMemory, getLessons, getTreeOfLifeState, getCurrentZodiac, summarizeEntity, loadSunRLPolicy,
-  PATHS_22, PILLARS, POLICY_FA, STAGE_FA, SPECIES, CHALLENGES,
+  PATHS_22, PILLARS, POLICY_FA, STAGE_FA, SPECIES, CHALLENGES, getSunObservation,
 } from "./simulation.js";
 import { initScene, renderScene, hitTestEntity, speciesLabel } from "./scene.js";
+import { getCognitiveAdvice, COGNITION_MODES, COGNITION_LABELS } from "./cognition.js";
+import { requestCognitiveProposal } from "../cognition/bridge.js";
 
 const BASE_SEED = 20260101;
 const LOCAL_KEY = "sunp-memory-v1";
@@ -16,6 +18,12 @@ let speed = 1;
 let timer = null;
 let storageMode = "local"; // "server" | "local"
 let saveStatus = "—";
+let cognitionMode = "both";
+let lastAdvice = null;
+let cognitionRequestInFlight = false;
+let externalCognitionStatus = "API خارجی هنوز آزمایش نشده";
+const DEFAULT_COGNITION_ENDPOINT = "https://sunp-cognition-api.onrender.com";
+const COGNITION_ENDPOINT_KEY = "sunp-cognition-endpoint";
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("world");
@@ -104,6 +112,19 @@ function renderPopulation() {
     .map((s) => `<div class="pill"><span>${speciesLabel(s)}</span><b>${sc[s] || 0}</b></div>`).join("");
 }
 
+function renderCognition() {
+  const modeSelect = $("cognitionMode");
+  if (modeSelect && modeSelect.value !== cognitionMode) modeSelect.value = cognitionMode;
+  const advice = lastAdvice || getCognitiveAdvice(world, cognitionMode);
+  $("cognitionSummary").textContent = advice.summary || "خورشید تنها تصمیم می‌گیرد.";
+  $("cognitionModeLabel").textContent = COGNITION_LABELS[cognitionMode] || cognitionMode;
+  const scores = advice.policyScores;
+  $("cognitionSignals").innerHTML = scores ? Object.entries(scores).map(([p,v]) => `<span class="pill"><span>${POLICY_FA[p]}</span><b>${Math.round(v*100)}٪</b></span>`).join("") : "<span class=\"hint\">عامل‌های کمکی خاموش‌اند.</span>";
+  $("cognitionRules").textContent = advice.hyperon?.rules?.length ? advice.hyperon.rules.join(" · ") : "قاعده نمادین فعالی گزارش نشده.";
+  const status = $("cognitionServiceStatus");
+  if (status) status.textContent = advice.external ? `اتصال واقعی: ${advice.external.provider || advice.external.source}${advice.external.fallback ? " (بازگشت به baseline)" : ""} · پیشنهاد: ${POLICY_FA[advice.external.policy] || advice.external.policy}` : externalCognitionStatus;
+}
+
 function renderPolicy() {
   $("policy").textContent = `${POLICY_FA[world.sun.policy]} · سطح خورشید ${world.sun.level} (چرخه خرد: ${world.sun.wisdomCycles})`;
   $("sunLevel").textContent = world.sun.level;
@@ -188,6 +209,7 @@ function renderAll() {
   renderStats();
   renderPopulation();
   renderPolicy();
+  renderCognition();
   renderHistory();
   renderMemory();
   renderTreeOfLife();
@@ -195,10 +217,35 @@ function renderAll() {
 }
 
 // ---------- حلقه شبیه‌سازی ----------
-function doStep() {
-  step(world);
-  renderAll();
-  if (world.tick % SAVE_EVERY === 0) persist();
+async function doStep() {
+  if (cognitionRequestInFlight) return;
+  cognitionRequestInFlight = true;
+  try {
+    lastAdvice = getCognitiveAdvice(world, cognitionMode);
+    if (cognitionMode === "braincog" || cognitionMode === "hyperon" || cognitionMode === "both") {
+      const endpoint = (localStorage.getItem(COGNITION_ENDPOINT_KEY) || DEFAULT_COGNITION_ENDPOINT).replace(/\/+$/, "");
+      const providers = cognitionMode === "both" ? ["braincog", "hyperon"] : [cognitionMode];
+      const proposals = await Promise.all(providers.map(provider => requestCognitiveProposal({
+        observation: getSunObservation(world),
+        state: world.challenge ? world.challenge.type : "calm",
+        provider,
+        endpoint: endpoint + "/decide",
+        timeoutMs: 1800,
+      })));
+      const valid = proposals.filter(Boolean);
+      if (valid.length) {
+        const scores = { ...(lastAdvice.policyScores || { repair: 0, conserve: 0, balance: 0, diversity: 0 }) };
+        for (const proposal of valid) scores[proposal.policy] = Math.min(1, (scores[proposal.policy] || 0) + 0.3);
+        const names = valid.map(p => p.provider || p.source).join(" + ");
+        lastAdvice = { ...lastAdvice, policyScores: scores, external: { ...valid[0], provider: names },
+          summary: [lastAdvice.summary, "پیشنهاد API واقعی: " + valid.map(p => POLICY_FA[p.policy] || p.policy).join("، ")].filter(Boolean).join(" · ") };
+        externalCognitionStatus = "پاسخ API دریافت شد: " + names;
+      } else externalCognitionStatus = "API عامل انتخاب‌شده پاسخ نداد؛ پیشنهاد محلی و PPO ادامه دارند.";
+    } else externalCognitionStatus = "حالت خورشید تنها است؛ درخواست API ارسال نمی‌شود.";
+    step(world, { cognitiveAdvice: lastAdvice });
+    renderAll();
+    if (world.tick % SAVE_EVERY === 0) persist();
+  } finally { cognitionRequestInFlight = false; }
 }
 
 function scheduleLoop() {
@@ -212,7 +259,45 @@ function frame(t) {
   requestAnimationFrame(frame);
 }
 
+function runCognitionBenchmark() {
+  const button = $("cognitionBenchmark"), output = $("cognitionBenchmarkResult");
+  button.disabled = true; output.textContent = "در حال مقایسه؛ جهان زنده فعلی تغییر نمی‌کند…";
+  setTimeout(() => {
+    try {
+      const modes = ["off", "braincog", "hyperon", "both"], seeds = [101,202,303], ticks = 250;
+      const rows = modes.map(mode => {
+        const runs = seeds.map(seed => {
+          const w = createWorld(seed); let health=0, population=0, richness=0, alive=0;
+          for(let i=0;i<ticks;i++){ const advice=getCognitiveAdvice(w,mode); step(w,{cognitiveAdvice:advice}); health+=w.healthIndex; population+=w.population.length; richness+=new Set(w.population.map(e=>e.species)).size; if(w.population.length)alive++; }
+          return {health:health/ticks,population:population/ticks,richness:richness/ticks,alive:alive/ticks};
+        });
+        const avg=k=>runs.reduce((s,r)=>s+r[k],0)/runs.length;
+        return {mode,health:avg("health"),population:avg("population"),richness:avg("richness"),alive:avg("alive")};
+      });
+      const header="<p class=\"hint\">۳ بذر یکسان برای هر حالت · هر اجرا ۲۵۰ گام · PPO در همه حالت‌ها فعال است.</p>";
+      const rowsHtml=rows.map(r=>"<tr><td>"+COGNITION_LABELS[r.mode]+"</td><td>"+r.health.toFixed(1)+"</td><td>"+r.population.toFixed(1)+"</td><td>"+r.richness.toFixed(1)+"</td><td>"+(r.alive*100).toFixed(0)+"٪</td></tr>").join("");
+      output.innerHTML=header+"<div class=\"benchmark-table\"><table><thead><tr><th>حالت</th><th>سلامت میانگین</th><th>جمعیت</th><th>تنوع</th><th>بقای جمعیت</th></tr></thead><tbody>"+rowsHtml+"</tbody></table></div><p class=\"hint\">آزمون مرورگری مدل نمادین با سیگنال‌های سبک‌شده است؛ اجرای واقعی پکیج‌های Python نیست و به‌تنهایی اثبات برتری محسوب نمی‌شود.</p>";
+    } catch(error) { output.textContent="مقایسه ناموفق: "+error.message; }
+    finally { button.disabled=false; }
+  },30);
+}
+
 function bindControls() {
+  $("cognitionMode").addEventListener("change", () => { cognitionMode = $("cognitionMode").value; lastAdvice = getCognitiveAdvice(world, cognitionMode); renderCognition(); });
+  $("cognitionBenchmark").addEventListener("click", runCognitionBenchmark);
+  const endpointInput = $("cognitionEndpoint");
+  if (endpointInput) {
+    endpointInput.value = localStorage.getItem(COGNITION_ENDPOINT_KEY) || DEFAULT_COGNITION_ENDPOINT;
+    endpointInput.addEventListener("change", () => { localStorage.setItem(COGNITION_ENDPOINT_KEY, endpointInput.value.trim().replace(/\/+$/, "")); externalCognitionStatus = "آدرس API ذخیره شد."; renderCognition(); });
+  }
+  const testApi = $("testCognitionApi");
+  if (testApi) testApi.addEventListener("click", async () => {
+    const endpoint = (endpointInput?.value || DEFAULT_COGNITION_ENDPOINT).trim().replace(/\/+$/, "");
+    testApi.disabled = true; externalCognitionStatus = "در حال بررسی /health…"; renderCognition();
+    try { const response = await fetch(endpoint + "/health", { cache: "no-store" }); const data = await response.json(); externalCognitionStatus = response.ok && data.ok ? `API متصل است · provider: ${data.provider}` : `پاسخ سلامت نامعتبر: HTTP ${response.status}`; }
+    catch { externalCognitionStatus = "اتصال ناموفق؛ CORS، آدرس یا بیدارشدن Render را بررسی کن."; }
+    finally { testApi.disabled = false; renderCognition(); }
+  });
   $("toggle").addEventListener("click", () => { running = !running; scheduleLoop(); });
   $("step").addEventListener("click", () => { running = false; scheduleLoop(); doStep(); });
   $("reset").addEventListener("click", async () => {

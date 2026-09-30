@@ -1,0 +1,3 @@
+# Runtime dependencies for real BrainCog and Hyperon provider modes.
+braincog
+hyperon==0.2.10

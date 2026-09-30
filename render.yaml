@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: sunp-cognition-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: cognition
+    buildCommand: pip install -r requirements.txt
+    startCommand: python service.py
+    healthCheckPath: /health
+    envVars:
+      - key: SUNP_COGNITION_PROVIDER
+        value: baseline
+      - key: SUNP_COGNITION_ALLOWED_ORIGIN
+        value: https://iojh2021-oss.github.io
