@@ -22,7 +22,7 @@ let cognitionMode = "both";
 let lastAdvice = null;
 let cognitionRequestInFlight = false;
 let externalCognitionStatus = "API خارجی هنوز آزمایش نشده";
-const DEFAULT_COGNITION_ENDPOINT = "https://sunp-cognition-api.onrender.com";
+const DEFAULT_COGNITION_ENDPOINT = "https://sunp-cognition-proxy.iojh2021oss.workers.dev";
 const COGNITION_ENDPOINT_KEY = "sunp-cognition-endpoint";
 
 const $ = (id) => document.getElementById(id);
