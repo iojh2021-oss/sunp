@@ -1,0 +1,21 @@
+name: Deploy Cloudflare Worker (sunp-cognition-proxy)
+
+on:
+  push:
+    paths:
+      - 'worker/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.APITOKENCLOUDFLAREWORK }}
+          accountId: "5f7517aea83811e467b90105d9ec9d38"
+          workingDirectory: worker
+          command: deploy
