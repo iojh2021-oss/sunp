@@ -71,7 +71,7 @@ class BrainCogAgent(nn.Module):
             # Positive reward reinforces the selected action; negative reward
             # reverses the update direction without changing SunP authority.
             loss = nn.functional.cross_entropy(scores.unsqueeze(0), target)
-            signed_loss = loss * (-1.0 if reward > 0 else 1.0)
+            signed_loss = loss if reward > 0 else -loss
             if abs(reward) < 0.05:
                 return {"trained": False, "loss": float(loss.detach()), "steps": self.steps}
             (signed_loss * min(1.0, abs(reward) / 3.0)).backward()
