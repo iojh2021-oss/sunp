@@ -1,6 +1,15 @@
 name: Cognitive providers isolated smoke tests
 
 on:
+  push:
+    branches:
+      - "feat/render-cognition-service"
+    paths:
+      - "cognition/**"
+      - "src/**"
+      - "index.html"
+      - "style.css"
+      - ".github/workflows/cognition-providers.yml"
   pull_request:
     paths:
       - "cognition/**"
