@@ -1,588 +1,588 @@
 {
-  "algorithm": "PPO",
+  "algorithm": "PPO-LSTM",
   "frames": 50000,
   "episodes": 83,
   "recentEpisodes": [
     {
       "episode": 1,
-      "reward": 85.95187714974332,
-      "health": 66.11271048153603,
-      "population": 58,
-      "richness": 5
-    },
-    {
-      "episode": 2,
-      "reward": 57.98813694492988,
-      "health": 58.0518796472132,
-      "population": 58,
-      "richness": 8
-    },
-    {
-      "episode": 3,
-      "reward": 38.58970170190124,
-      "health": 65.01320457462968,
-      "population": 52,
-      "richness": 10
-    },
-    {
-      "episode": 4,
-      "reward": 58.994994504122836,
-      "health": 65.06457109034245,
-      "population": 60,
-      "richness": 6
-    },
-    {
-      "episode": 5,
-      "reward": 84.91943250882406,
-      "health": 70.15811498313037,
-      "population": 58,
-      "richness": 10
-    },
-    {
-      "episode": 6,
-      "reward": 50.04516615712459,
-      "health": 75.8058437142433,
-      "population": 61,
-      "richness": 6
-    },
-    {
-      "episode": 7,
-      "reward": 55.08946649623079,
-      "health": 64.6334834894192,
-      "population": 60,
-      "richness": 9
-    },
-    {
-      "episode": 8,
-      "reward": 39.61291662615987,
-      "health": 56.91908907348714,
-      "population": 56,
-      "richness": 9
-    },
-    {
-      "episode": 9,
-      "reward": 28.31158164074878,
-      "health": 58.06247797662474,
+      "reward": 38.823920662054526,
+      "health": 64.80115263448118,
       "population": 62,
       "richness": 8
     },
     {
-      "episode": 10,
-      "reward": 53.464619650332594,
-      "health": 55.47716845002999,
+      "episode": 2,
+      "reward": 48.735355097348005,
+      "health": 54.9702200152342,
+      "population": 59,
+      "richness": 6
+    },
+    {
+      "episode": 3,
+      "reward": 73.46869087756757,
+      "health": 74.4156651313742,
+      "population": 58,
+      "richness": 12
+    },
+    {
+      "episode": 4,
+      "reward": 51.306282817524384,
+      "health": 60.40826201254292,
+      "population": 59,
+      "richness": 7
+    },
+    {
+      "episode": 5,
+      "reward": 44.117763122240966,
+      "health": 55.327014728780185,
       "population": 60,
+      "richness": 9
+    },
+    {
+      "episode": 6,
+      "reward": 47.67328869949932,
+      "health": 70.81066386800057,
+      "population": 60,
+      "richness": 9
+    },
+    {
+      "episode": 7,
+      "reward": 50.25221867475471,
+      "health": 62.598922562506104,
+      "population": 60,
+      "richness": 10
+    },
+    {
+      "episode": 8,
+      "reward": 49.67755874173878,
+      "health": 75.18309239760157,
+      "population": 61,
+      "richness": 11
+    },
+    {
+      "episode": 9,
+      "reward": 61.01808597228529,
+      "health": 54.765670099671496,
+      "population": 59,
+      "richness": 7
+    },
+    {
+      "episode": 10,
+      "reward": 34.04461109054825,
+      "health": 57.23594070779622,
+      "population": 61,
       "richness": 7
     },
     {
       "episode": 11,
-      "reward": 73.82466599612843,
-      "health": 68.07953467201791,
+      "reward": 62.013429610093375,
+      "health": 50.33570374586782,
+      "population": 60,
+      "richness": 7
+    },
+    {
+      "episode": 12,
+      "reward": 75.66408584818663,
+      "health": 65.43481883736354,
+      "population": 55,
+      "richness": 8
+    },
+    {
+      "episode": 13,
+      "reward": 64.70173823378235,
+      "health": 59.699927168915764,
+      "population": 58,
+      "richness": 6
+    },
+    {
+      "episode": 14,
+      "reward": 60.178339906337364,
+      "health": 58.032026681795,
       "population": 62,
       "richness": 9
     },
     {
-      "episode": 12,
-      "reward": 64.07274321563294,
-      "health": 60.56222278307648,
+      "episode": 15,
+      "reward": 59.98210040620403,
+      "health": 52.00417114658759,
       "population": 59,
-      "richness": 9
+      "richness": 5
     },
     {
-      "episode": 13,
-      "reward": 45.55748348402574,
-      "health": 73.90451323004882,
+      "episode": 16,
+      "reward": 65.70137290170537,
+      "health": 72.66300255995183,
+      "population": 60,
+      "richness": 11
+    },
+    {
+      "episode": 17,
+      "reward": 48.56154058921362,
+      "health": 74.06813912565339,
+      "population": 56,
+      "richness": 11
+    },
+    {
+      "episode": 18,
+      "reward": 55.47328372779011,
+      "health": 70.09284078964149,
+      "population": 62,
+      "richness": 8
+    },
+    {
+      "episode": 19,
+      "reward": 33.59575169138645,
+      "health": 57.90996199436959,
+      "population": 61,
+      "richness": 5
+    },
+    {
+      "episode": 20,
+      "reward": 41.28958791367775,
+      "health": 77.10905320007085,
       "population": 61,
       "richness": 10
     },
     {
-      "episode": 14,
-      "reward": 70.79062852099362,
-      "health": 54.60691401466468,
-      "population": 56,
-      "richness": 7
-    },
-    {
-      "episode": 15,
-      "reward": 46.920900828048445,
-      "health": 62.13127867732084,
-      "population": 60,
-      "richness": 10
-    },
-    {
-      "episode": 16,
-      "reward": 93.8870439655332,
-      "health": 59.26960644659138,
-      "population": 60,
-      "richness": 8
-    },
-    {
-      "episode": 17,
-      "reward": 73.91218569504153,
-      "health": 58.9208390294192,
-      "population": 58,
-      "richness": 9
-    },
-    {
-      "episode": 18,
-      "reward": 46.29294258795924,
-      "health": 76.88552687172218,
-      "population": 59,
-      "richness": 10
-    },
-    {
-      "episode": 19,
-      "reward": 59.968221600580854,
-      "health": 54.02132858149916,
-      "population": 59,
-      "richness": 6
-    },
-    {
-      "episode": 20,
-      "reward": 41.67005405186178,
-      "health": 62.54416692937018,
-      "population": 60,
-      "richness": 8
-    },
-    {
       "episode": 21,
-      "reward": 61.551900625678606,
-      "health": 63.03846654686321,
+      "reward": 38.405573399014536,
+      "health": 54.081970528118205,
       "population": 60,
       "richness": 9
     },
     {
       "episode": 22,
-      "reward": 72.029873515143,
-      "health": 57.13500788522935,
-      "population": 61,
-      "richness": 6
+      "reward": 50.35188871831917,
+      "health": 63.1500926408921,
+      "population": 62,
+      "richness": 10
     },
     {
       "episode": 23,
-      "reward": 49.00946631462116,
-      "health": 63.25627673820274,
+      "reward": 68.00969222720715,
+      "health": 65.69821845111868,
       "population": 59,
-      "richness": 8
+      "richness": 7
     },
     {
       "episode": 24,
-      "reward": 42.20166481004721,
-      "health": 72.88910148421358,
-      "population": 61,
-      "richness": 8
-    },
-    {
-      "episode": 25,
-      "reward": 66.02907149349885,
-      "health": 56.77651947683744,
-      "population": 57,
-      "richness": 6
-    },
-    {
-      "episode": 26,
-      "reward": 54.311585981398316,
-      "health": 64.02220431107912,
-      "population": 60,
-      "richness": 9
-    },
-    {
-      "episode": 27,
-      "reward": 52.40842770672747,
-      "health": 54.58715269153665,
-      "population": 60,
-      "richness": 8
-    },
-    {
-      "episode": 28,
-      "reward": 53.51968173484928,
-      "health": 64.808974781419,
+      "reward": 53.52126488935933,
+      "health": 63.319162272741124,
       "population": 61,
       "richness": 7
     },
     {
-      "episode": 29,
-      "reward": 48.98591562639803,
-      "health": 56.37662419909347,
+      "episode": 25,
+      "reward": 72.31838223115425,
+      "health": 74.9718931971793,
+      "population": 61,
+      "richness": 7
+    },
+    {
+      "episode": 26,
+      "reward": 65.00464295562735,
+      "health": 57.21655729895622,
+      "population": 52,
+      "richness": 7
+    },
+    {
+      "episode": 27,
+      "reward": 28.413206933825762,
+      "health": 70.36226794497969,
+      "population": 61,
+      "richness": 10
+    },
+    {
+      "episode": 28,
+      "reward": 51.68450140644414,
+      "health": 60.65404038015865,
       "population": 59,
+      "richness": 11
+    },
+    {
+      "episode": 29,
+      "reward": 58.9243300695306,
+      "health": 74.28488994420012,
+      "population": 62,
       "richness": 9
     },
     {
       "episode": 30,
-      "reward": 60.835982661794624,
-      "health": 73.9213279140923,
+      "reward": 61.49233744035104,
+      "health": 64.37925881787291,
       "population": 61,
-      "richness": 10
+      "richness": 8
     },
     {
       "episode": 31,
-      "reward": 45.94632117585827,
-      "health": 59.638448191075476,
-      "population": 61,
-      "richness": 9
+      "reward": 56.848588496723714,
+      "health": 64.18505918102166,
+      "population": 60,
+      "richness": 7
     },
     {
       "episode": 32,
-      "reward": 62.08972797830267,
-      "health": 57.29852158102016,
-      "population": 60,
-      "richness": 6
+      "reward": 47.48950163412846,
+      "health": 63.9507886762631,
+      "population": 61,
+      "richness": 7
     },
     {
       "episode": 33,
-      "reward": 60.472622017185756,
-      "health": 60.4126808110161,
-      "population": 61,
+      "reward": 62.40961768017518,
+      "health": 58.74549047660777,
+      "population": 60,
       "richness": 7
     },
     {
       "episode": 34,
-      "reward": 59.13207151052112,
-      "health": 56.683633057011484,
-      "population": 60,
-      "richness": 6
+      "reward": 49.28061860225826,
+      "health": 53.594844778485815,
+      "population": 42,
+      "richness": 5
     },
     {
       "episode": 35,
-      "reward": 62.55859027618015,
-      "health": 55.150055671251934,
-      "population": 61,
-      "richness": 8
+      "reward": 51.76584129099426,
+      "health": 46.95134408109922,
+      "population": 56,
+      "richness": 7
     },
     {
       "episode": 36,
-      "reward": 53.19681679017618,
-      "health": 58.17782388502263,
-      "population": 60,
-      "richness": 7
-    },
-    {
-      "episode": 37,
-      "reward": 37.32203760734125,
-      "health": 50.31173047602688,
-      "population": 60,
-      "richness": 6
-    },
-    {
-      "episode": 38,
-      "reward": 64.58318402747172,
-      "health": 59.56518919573683,
-      "population": 60,
-      "richness": 9
-    },
-    {
-      "episode": 39,
-      "reward": 27.07952994033558,
-      "health": 56.27253016566775,
-      "population": 60,
-      "richness": 6
-    },
-    {
-      "episode": 40,
-      "reward": 49.06609661056362,
-      "health": 55.67495337891954,
-      "population": 61,
-      "richness": 7
-    },
-    {
-      "episode": 41,
-      "reward": 51.560767741877974,
-      "health": 61.396682873929386,
-      "population": 60,
-      "richness": 8
-    },
-    {
-      "episode": 42,
-      "reward": 42.039864462793645,
-      "health": 54.95892935670223,
-      "population": 60,
-      "richness": 7
-    },
-    {
-      "episode": 43,
-      "reward": 39.126078685603545,
-      "health": 58.85059034779462,
-      "population": 63,
-      "richness": 8
-    },
-    {
-      "episode": 44,
-      "reward": 75.59191122353089,
-      "health": 57.48564770706339,
-      "population": 57,
-      "richness": 6
-    },
-    {
-      "episode": 45,
-      "reward": 54.77029446271605,
-      "health": 60.86680413325831,
+      "reward": 37.500639208514194,
+      "health": 55.83039779327936,
       "population": 59,
       "richness": 8
     },
     {
-      "episode": 46,
-      "reward": 42.7073088762683,
-      "health": 52.3509198698314,
-      "population": 48,
-      "richness": 8
-    },
-    {
-      "episode": 47,
-      "reward": 74.49530155583486,
-      "health": 65.41597242598455,
-      "population": 62,
-      "richness": 8
-    },
-    {
-      "episode": 48,
-      "reward": 59.01237761882486,
-      "health": 61.568990822597264,
-      "population": 57,
-      "richness": 9
-    },
-    {
-      "episode": 49,
-      "reward": 45.276753115226256,
-      "health": 64.66779087312568,
-      "population": 58,
-      "richness": 7
-    },
-    {
-      "episode": 50,
-      "reward": 49.746549891551794,
-      "health": 61.14550630873728,
+      "episode": 37,
+      "reward": 41.78990618404107,
+      "health": 61.37135039116424,
       "population": 61,
       "richness": 10
     },
     {
-      "episode": 51,
-      "reward": 65.90732714707379,
-      "health": 54.90066853469464,
+      "episode": 38,
+      "reward": 54.064211256130356,
+      "health": 68.18945319938707,
+      "population": 58,
+      "richness": 7
+    },
+    {
+      "episode": 39,
+      "reward": 44.349740420439986,
+      "health": 71.04472437432564,
+      "population": 61,
+      "richness": 10
+    },
+    {
+      "episode": 40,
+      "reward": 47.66859980634538,
+      "health": 51.13769911933776,
+      "population": 57,
+      "richness": 5
+    },
+    {
+      "episode": 41,
+      "reward": 64.21313217922665,
+      "health": 57.944470410780205,
+      "population": 61,
+      "richness": 6
+    },
+    {
+      "episode": 42,
+      "reward": 45.59639833249639,
+      "health": 67.28779040380881,
+      "population": 55,
+      "richness": 8
+    },
+    {
+      "episode": 43,
+      "reward": 39.99901942611462,
+      "health": 54.89892523365147,
+      "population": 40,
+      "richness": 7
+    },
+    {
+      "episode": 44,
+      "reward": 56.83331110236712,
+      "health": 66.84472423146049,
+      "population": 59,
+      "richness": 7
+    },
+    {
+      "episode": 45,
+      "reward": 58.67745205122078,
+      "health": 72.64709884197202,
+      "population": 58,
+      "richness": 9
+    },
+    {
+      "episode": 46,
+      "reward": 67.0799994154545,
+      "health": 49.29840594577751,
       "population": 58,
       "richness": 5
     },
     {
-      "episode": 52,
-      "reward": 72.46633646584624,
-      "health": 67.32280956381919,
-      "population": 63,
+      "episode": 47,
+      "reward": 39.749839215068015,
+      "health": 64.16224374285316,
+      "population": 62,
       "richness": 9
     },
     {
-      "episode": 53,
-      "reward": 45.393800883994935,
-      "health": 55.967354339031154,
-      "population": 59,
+      "episode": 48,
+      "reward": 74.18761028623395,
+      "health": 65.08353077447632,
+      "population": 60,
+      "richness": 7
+    },
+    {
+      "episode": 49,
+      "reward": 66.29401966425644,
+      "health": 62.50816005528903,
+      "population": 62,
+      "richness": 8
+    },
+    {
+      "episode": 50,
+      "reward": 69.07367962782047,
+      "health": 55.16457349827803,
+      "population": 60,
+      "richness": 7
+    },
+    {
+      "episode": 51,
+      "reward": 39.939761118136005,
+      "health": 61.91338932550954,
+      "population": 56,
+      "richness": 9
+    },
+    {
+      "episode": 52,
+      "reward": 51.91171849516798,
+      "health": 54.9019022609731,
+      "population": 60,
       "richness": 6
     },
     {
-      "episode": 54,
-      "reward": 74.26975671864452,
-      "health": 61.20507678525471,
+      "episode": 53,
+      "reward": 64.28457036674634,
+      "health": 57.49341526703952,
       "population": 61,
       "richness": 8
     },
     {
-      "episode": 55,
-      "reward": 60.141347132339725,
-      "health": 63.368812102748706,
-      "population": 61,
+      "episode": 54,
+      "reward": 54.17335659010492,
+      "health": 64.38207201305384,
+      "population": 51,
       "richness": 9
     },
     {
+      "episode": 55,
+      "reward": 66.10103632057593,
+      "health": 65.41914227653128,
+      "population": 60,
+      "richness": 8
+    },
+    {
       "episode": 56,
-      "reward": 42.693905526413204,
-      "health": 52.16266801343483,
-      "population": 56,
+      "reward": 49.900622458839514,
+      "health": 55.38509642494044,
+      "population": 59,
       "richness": 6
     },
     {
       "episode": 57,
-      "reward": 54.92032786044224,
-      "health": 63.03384415044895,
-      "population": 61,
-      "richness": 5
-    },
-    {
-      "episode": 58,
-      "reward": 32.89296406292168,
-      "health": 61.01789368549862,
+      "reward": 67.48979084703228,
+      "health": 66.2609287445558,
       "population": 60,
-      "richness": 7
-    },
-    {
-      "episode": 59,
-      "reward": 41.175308033505885,
-      "health": 65.86108662375068,
-      "population": 61,
       "richness": 10
     },
     {
-      "episode": 60,
-      "reward": 59.75510566469617,
-      "health": 52.55024129614247,
-      "population": 61,
-      "richness": 8
-    },
-    {
-      "episode": 61,
-      "reward": 71.34691800862556,
-      "health": 70.99123066417985,
-      "population": 56,
+      "episode": 58,
+      "reward": 58.003244031868306,
+      "health": 67.17663092909333,
+      "population": 63,
       "richness": 9
     },
     {
+      "episode": 59,
+      "reward": 60.20632778069003,
+      "health": 61.00618236904846,
+      "population": 61,
+      "richness": 7
+    },
+    {
+      "episode": 60,
+      "reward": 50.29526183418885,
+      "health": 48.47427017401245,
+      "population": 57,
+      "richness": 5
+    },
+    {
+      "episode": 61,
+      "reward": 48.39990124565487,
+      "health": 53.16218861913168,
+      "population": 56,
+      "richness": 7
+    },
+    {
       "episode": 62,
-      "reward": 61.29269180253564,
-      "health": 60.50638872053382,
-      "population": 62,
+      "reward": 49.391580267306075,
+      "health": 59.36219251411991,
+      "population": 60,
       "richness": 8
     },
     {
       "episode": 63,
-      "reward": 67.67266157904184,
-      "health": 69.38879421485059,
+      "reward": 48.83830069717085,
+      "health": 65.50801983152387,
       "population": 61,
       "richness": 10
     },
     {
       "episode": 64,
-      "reward": 61.67082895263027,
-      "health": 65.83625827427804,
-      "population": 61,
-      "richness": 10
+      "reward": 52.72241889523959,
+      "health": 47.20626079261775,
+      "population": 55,
+      "richness": 6
     },
     {
       "episode": 65,
-      "reward": 54.293050688743406,
-      "health": 61.9200602466851,
+      "reward": 34.15033353148448,
+      "health": 56.68067006947115,
       "population": 60,
-      "richness": 8
+      "richness": 7
     },
     {
       "episode": 66,
-      "reward": 72.5672754167557,
-      "health": 62.479624704951036,
-      "population": 57,
-      "richness": 9
+      "reward": 81.4989537042677,
+      "health": 56.158709606750705,
+      "population": 61,
+      "richness": 7
     },
     {
       "episode": 67,
-      "reward": 44.612180231479286,
-      "health": 66.12954269024728,
-      "population": 58,
-      "richness": 10
-    },
-    {
-      "episode": 68,
-      "reward": 68.64468387079447,
-      "health": 64.36264622586377,
-      "population": 63,
+      "reward": 34.82420010696352,
+      "health": 60.61569446466704,
+      "population": 62,
       "richness": 9
     },
     {
-      "episode": 69,
-      "reward": 39.9979584723604,
-      "health": 64.4117736594653,
+      "episode": 68,
+      "reward": 53.68643633794094,
+      "health": 58.37574236776135,
       "population": 61,
       "richness": 10
     },
     {
+      "episode": 69,
+      "reward": 83.69425968048172,
+      "health": 61.89845000519274,
+      "population": 63,
+      "richness": 7
+    },
+    {
       "episode": 70,
-      "reward": 30.66630757094281,
-      "health": 59.119960574199865,
-      "population": 62,
-      "richness": 8
+      "reward": 50.478820147375956,
+      "health": 68.68289305218214,
+      "population": 61,
+      "richness": 9
     },
     {
       "episode": 71,
-      "reward": 55.89383475074268,
-      "health": 60.80694821797377,
-      "population": 59,
+      "reward": 68.04993463280066,
+      "health": 68.49574176010432,
+      "population": 61,
       "richness": 10
     },
     {
       "episode": 72,
-      "reward": 62.02367560905957,
-      "health": 52.02134589346119,
-      "population": 60,
+      "reward": 69.261073780863,
+      "health": 54.50552054751125,
+      "population": 48,
       "richness": 7
     },
     {
       "episode": 73,
-      "reward": 29.0103405170752,
-      "health": 48.931596074303116,
-      "population": 52,
+      "reward": 45.32289449128151,
+      "health": 66.57010290598478,
+      "population": 59,
       "richness": 9
     },
     {
       "episode": 74,
-      "reward": 42.91908458882021,
-      "health": 66.26263987702221,
+      "reward": 68.21629093498719,
+      "health": 63.61620457954132,
       "population": 60,
-      "richness": 9
+      "richness": 8
     },
     {
       "episode": 75,
-      "reward": 55.07335650413443,
-      "health": 52.104010790549836,
-      "population": 50,
+      "reward": 74.32438528851387,
+      "health": 68.23976439666895,
+      "population": 60,
       "richness": 7
     },
     {
       "episode": 76,
-      "reward": 63.533948993517804,
-      "health": 59.32852995441812,
-      "population": 58,
-      "richness": 6
+      "reward": 50.58099471662251,
+      "health": 72.43315986937307,
+      "population": 60,
+      "richness": 11
     },
     {
       "episode": 77,
-      "reward": 30.146269745257964,
-      "health": 59.451081596106434,
-      "population": 60,
-      "richness": 9
+      "reward": 68.0690384776785,
+      "health": 54.757419275590394,
+      "population": 51,
+      "richness": 7
     },
     {
       "episode": 78,
-      "reward": 49.54232515147862,
-      "health": 67.33293674898113,
-      "population": 62,
+      "reward": 37.76282556767198,
+      "health": 57.29029851562575,
+      "population": 59,
       "richness": 9
     },
     {
       "episode": 79,
-      "reward": 45.38596935905627,
-      "health": 67.60902629132727,
-      "population": 59,
-      "richness": 10
+      "reward": 61.95576452251641,
+      "health": 65.49820838018803,
+      "population": 60,
+      "richness": 9
     },
     {
       "episode": 80,
-      "reward": 65.62195177252022,
-      "health": 70.51349328609673,
+      "reward": 59.250837986971554,
+      "health": 68.8007547637321,
       "population": 60,
-      "richness": 8
+      "richness": 9
     },
     {
       "episode": 81,
-      "reward": 58.22346397860443,
-      "health": 66.1602776890497,
-      "population": 60,
-      "richness": 7
+      "reward": 54.51955391268366,
+      "health": 65.92218346107484,
+      "population": 63,
+      "richness": 6
     },
     {
       "episode": 82,
-      "reward": 54.73257453321224,
-      "health": 63.50349743637119,
-      "population": 62,
-      "richness": 11
+      "reward": 45.964829844420265,
+      "health": 54.08892328026335,
+      "population": 59,
+      "richness": 6
     },
     {
       "episode": 83,
-      "reward": 65.38027211022639,
-      "health": 61.81942781808607,
-      "population": 62,
-      "richness": 8
+      "reward": 42.227442946393644,
+      "health": 66.75244505398803,
+      "population": 60,
+      "richness": 7
     }
   ]
 }
