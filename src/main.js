@@ -5,7 +5,7 @@ import {
 } from "./simulation.js";
 import { initScene, renderScene, hitTestEntity, speciesLabel } from "./scene.js";
 import { getCognitiveAdvice, COGNITION_MODES, COGNITION_LABELS } from "./cognition.js";
-import { requestCognitiveProposal } from "../cognition/bridge.js";
+import { requestCognitiveProposal, sendCognitiveFeedback } from "../cognition/bridge.js";
 
 const BASE_SEED = 20260101;
 const LOCAL_KEY = "sunp-memory-v1";
@@ -22,7 +22,7 @@ let cognitionMode = "both";
 let lastAdvice = null;
 let cognitionRequestInFlight = false;
 let externalCognitionStatus = "API خارجی هنوز آزمایش نشده";
-const DEFAULT_COGNITION_ENDPOINT = "https://sunp-cognition-proxy.iojh2021oss.workers.dev";
+const DEFAULT_COGNITION_ENDPOINT = "https://sunp-cognition-api.onrender.com";
 const COGNITION_ENDPOINT_KEY = "sunp-cognition-endpoint";
 
 const $ = (id) => document.getElementById(id);
@@ -222,17 +222,21 @@ async function doStep() {
   cognitionRequestInFlight = true;
   try {
     lastAdvice = getCognitiveAdvice(world, cognitionMode);
+    let endpoint = "";
+    let observation = null;
+    let valid = [];
     if (cognitionMode === "braincog" || cognitionMode === "hyperon" || cognitionMode === "both") {
-      const endpoint = (localStorage.getItem(COGNITION_ENDPOINT_KEY) || DEFAULT_COGNITION_ENDPOINT).replace(/\/+$/, "");
+      endpoint = (localStorage.getItem(COGNITION_ENDPOINT_KEY) || DEFAULT_COGNITION_ENDPOINT).replace(/\/+$/, "");
       const providers = cognitionMode === "both" ? ["braincog", "hyperon"] : [cognitionMode];
+      observation = getSunObservation(world);
       const proposals = await Promise.all(providers.map(provider => requestCognitiveProposal({
-        observation: getSunObservation(world),
+        observation,
         state: world.challenge ? world.challenge.type : "calm",
         provider,
         endpoint: endpoint + "/decide",
         timeoutMs: 1800,
       })));
-      const valid = proposals.filter(Boolean);
+      valid = proposals.filter(Boolean);
       if (valid.length) {
         const scores = { ...(lastAdvice.policyScores || { repair: 0, conserve: 0, balance: 0, diversity: 0 }) };
         for (const proposal of valid) scores[proposal.policy] = Math.min(1, (scores[proposal.policy] || 0) + 0.3);
@@ -240,14 +244,32 @@ async function doStep() {
         lastAdvice = { ...lastAdvice, policyScores: scores, external: { ...valid[0], provider: names },
           summary: [lastAdvice.summary, "پیشنهاد API واقعی: " + valid.map(p => POLICY_FA[p.policy] || p.policy).join("، ")].filter(Boolean).join(" · ") };
         externalCognitionStatus = "پاسخ API دریافت شد: " + names;
-      } else externalCognitionStatus = "API عامل انتخاب‌شده پاسخ نداد؛ پیشنهاد محلی و PPO ادامه دارند.";
-    } else externalCognitionStatus = "حالت خورشید تنها است؛ درخواست API ارسال نمی‌شود.";
+      } else {
+        externalCognitionStatus = "API عامل انتخاب‌شده پاسخ نداد؛ پیشنهاد محلی و PPO ادامه دارند.";
+      }
+    } else {
+      externalCognitionStatus = "حالت خورشید تنها است؛ درخواست API ارسال نمی‌شود.";
+    }
     step(world, { cognitiveAdvice: lastAdvice });
+    if (valid.length && observation && endpoint) {
+      await Promise.all(valid.map(proposal => {
+        if (!["braincog", "hyperon"].includes(proposal.provider)) return null;
+        return sendCognitiveFeedback({
+          observation,
+          provider: proposal.provider,
+          policy: proposal.policy,
+          reward: world.lastReward,
+          endpoint: endpoint + "/feedback",
+          timeoutMs: 1800,
+        });
+      }));
+    }
     renderAll();
     if (world.tick % SAVE_EVERY === 0) persist();
-  } finally { cognitionRequestInFlight = false; }
+  } finally {
+    cognitionRequestInFlight = false;
+  }
 }
-
 function scheduleLoop() {
   clearInterval(timer);
   if (running) timer = setInterval(doStep, TICK_BASE_MS / speed);

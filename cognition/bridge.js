@@ -18,6 +18,10 @@ export function validateProposal(payload) {
     rationale: typeof payload.rationale === "string" ? payload.rationale.slice(0, 500) : "",
     provider: typeof payload.provider === "string" ? payload.provider.slice(0, 80) : "",
     fallback: payload.fallback === true,
+    scores: payload.scores && typeof payload.scores === "object" ? payload.scores : null,
+    confidence: Number.isFinite(payload.confidence) ? payload.confidence : null,
+    rules: Array.isArray(payload.rules) ? payload.rules.slice(0, 20) : [],
+    memoryState: typeof payload.memory_state === "string" ? payload.memory_state.slice(0, 120) : "",
   };
 }
 
@@ -59,4 +63,25 @@ export async function chooseCognitivePolicy(args) {
     rationale: "External cognitive service unavailable or returned an invalid proposal.",
     accepted: false,
   };
+}
+
+
+export async function sendCognitiveFeedback({ observation, provider, policy, reward, endpoint, token, fetchImpl = fetch, timeoutMs = 2500 } = {}) {
+  if (!validateObservation(observation) || !SUNP_POLICIES.includes(policy) || !["braincog", "hyperon"].includes(provider) || !Number.isFinite(reward) || !endpoint) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ version: 1, observation, provider, policy, reward }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
