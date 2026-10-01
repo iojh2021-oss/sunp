@@ -49,10 +49,16 @@ def decide(obs, provider=None):
             from hyperon_provider import decide as provider_decide
         else:
             raise ValueError("unknown provider")
-        policy = provider_decide(obs)
+        result = provider_decide(obs)
+        if isinstance(result, str):
+            result = {"policy": result}
+        policy = result.get("policy")
         if policy not in POLICIES:
             raise ValueError("provider returned invalid policy")
-        return {"policy": policy, "source": selected, "provider": selected, "fallback": False}
+        return {
+            "policy": policy, "source": selected, "provider": selected,
+            "fallback": False, **{k: v for k, v in result.items() if k != "policy"},
+        }
     except Exception as exc:
         return {
             "policy": baseline(obs), "source": "sunp-baseline-fallback",
@@ -92,7 +98,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path != "/decide":
+        if self.path not in {"/decide", "/feedback"}:
             return self.send_json(404, {"error": "not found"})
         if TOKEN and self.headers.get("Authorization") != "Bearer " + TOKEN:
             return self.send_json(401, {"error": "unauthorized"})
@@ -107,7 +113,22 @@ class Handler(BaseHTTPRequestHandler):
             requested_provider = data.get("provider")
             if requested_provider is not None and requested_provider not in {"braincog", "hyperon"}:
                 return self.send_json(400, {"error": "provider must be braincog or hyperon"})
-            return self.send_json(200, decide(obs, requested_provider))
+            if self.path == "/decide":
+                return self.send_json(200, decide(obs, requested_provider))
+            policy = data.get("policy")
+            reward = data.get("reward")
+            if requested_provider not in {"braincog", "hyperon"}:
+                return self.send_json(400, {"error": "feedback requires braincog or hyperon provider"})
+            if policy not in POLICIES or not isinstance(reward, (int, float)) or isinstance(reward, bool) or not math.isfinite(reward):
+                return self.send_json(400, {"error": "invalid feedback"})
+            try:
+                if requested_provider == "braincog":
+                    from braincog_provider import learn
+                else:
+                    from hyperon_provider import learn
+                return self.send_json(200, learn(obs, policy, reward))
+            except Exception as exc:
+                return self.send_json(500, {"error": "provider learning failed", "type": type(exc).__name__})
         except (ValueError, TypeError, json.JSONDecodeError):
             return self.send_json(400, {"error": "bad json"})
 
