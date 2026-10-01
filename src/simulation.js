@@ -190,8 +190,25 @@ function bestPolicy(vals) {
 const NN_INPUTS=16, NN_OUTPUTS=SUN_POLICIES.length;
 const PLAN_HORIZON=4;
 let trainedRLPolicy = null;
+function validFF(weights,bias,input,output){
+  return Array.isArray(weights)&&weights.length===output&&Array.isArray(bias)&&bias.length===output&&weights.every(row=>Array.isArray(row)&&row.length===input);
+}
 export function loadSunRLPolicy(model) {
-  if (!model || model.version !== 1 || model.inputSize !== NN_INPUTS || model.actions !== NN_OUTPUTS || !Array.isArray(model.layers)) return false;
+  if (!model || model.inputSize !== NN_INPUTS || model.actions !== NN_OUTPUTS) return false;
+  if (model.version === 2) {
+    // حافظه‌ی بلندمدت: بدنه‌ی خطی + یک سلول LSTM + سر تصمیم‌گیری (actor)؛ آموزش‌دیده در training/train_ppo.py
+    const b=model.body, r=model.lstm, a=model.actor;
+    if (!b || !r || !a) return false;
+    if (!validFF(b.weights,b.bias,NN_INPUTS,b.weights?.length)) return false;
+    const bodyOut=b.weights.length, H=r.hiddenSize;
+    if (!Number.isInteger(H) || H<=0 || H>256) return false;
+    if (!validFF(r.Wi,r.bi,bodyOut,4*H)) return false;
+    if (!validFF(r.Wh,r.bh,H,4*H)) return false;
+    if (!validFF(a.weights,a.bias,H,NN_OUTPUTS)) return false;
+    trainedRLPolicy=model;
+    return true;
+  }
+  if (model.version !== 1 || !Array.isArray(model.layers)) return false;
   let input=NN_INPUTS;
   for (const layer of model.layers) {
     if (!Array.isArray(layer.weights) || !Array.isArray(layer.bias) || layer.weights.length !== layer.bias.length || layer.weights.some(row => !Array.isArray(row) || row.length !== input)) return false;
@@ -201,12 +218,43 @@ export function loadSunRLPolicy(model) {
   trainedRLPolicy=model;
   return true;
 }
-function trainedPolicyLogits(features) {
-  if(!trainedRLPolicy)return null;
+const sigmoid=v=>1/(1+Math.exp(-v));
+const denseForward=(weights,bias,x)=>bias.map((b,o)=>b+weights[o].reduce((s,w,i)=>s+w*x[i],0));
+// یک گام سلول LSTM: حافظه (h,c) از گام قبل خوانده و به‌روزرسانی می‌شود؛ همان «حافظه‌ی بلندمدت» خورشید است.
+function lstmStep(r,z,state){
+  const H=r.hiddenSize,gate=new Array(4*H);
+  for(let g=0;g<4*H;g++){
+    let v=r.bi[g]+r.bh[g];
+    const wi=r.Wi[g],wh=r.Wh[g];
+    for(let i=0;i<wi.length;i++)v+=wi[i]*z[i];
+    for(let i=0;i<wh.length;i++)v+=wh[i]*state.h[i];
+    gate[g]=v;
+  }
+  const newH=new Array(H),newC=new Array(H);
+  for(let k=0;k<H;k++){
+    const i=sigmoid(gate[k]),f=sigmoid(gate[H+k]),g=Math.tanh(gate[2*H+k]),o=sigmoid(gate[3*H+k]);
+    const c2=f*state.c[k]+i*g;
+    newC[k]=c2;newH[k]=o*Math.tanh(c2);
+  }
+  state.h=newH;state.c=newC;
+  return newH;
+}
+function trainedPolicyLogits(world, features) {
+  const m=trainedRLPolicy;
+  if(!m)return null;
+  if (m.version===2 && m.lstm) {
+    const H=m.lstm.hiddenSize;
+    let state=world.sun.rlHidden;
+    if(!state||!Array.isArray(state.h)||state.h.length!==H)state=world.sun.rlHidden={h:Array(H).fill(0),c:Array(H).fill(0)};
+    const z=denseForward(m.body.weights,m.body.bias,features).map(Math.tanh);
+    const h=lstmStep(m.lstm,z,state);
+    return denseForward(m.actor.weights,m.actor.bias,h);
+  }
+  if (!Array.isArray(m.layers)) return null;
   let x=features.slice();
-  for(let l=0;l<trainedRLPolicy.layers.length;l++){
-    const layer=trainedRLPolicy.layers[l],last=l===trainedRLPolicy.layers.length-1;
-    x=layer.bias.map((b,o)=>{const z=b+layer.weights[o].reduce((sum,w,i)=>sum+w*x[i],0);return last?z:Math.tanh(z);});
+  for(let l=0;l<m.layers.length;l++){
+    const layer=m.layers[l],last=l===m.layers.length-1;
+    x=layer.bias.map((b,o)=>{const zz=b+layer.weights[o].reduce((sum,w,i)=>sum+w*x[i],0);return last?zz:Math.tanh(zz);});
   }
   return x;
 }
@@ -281,6 +329,7 @@ function defaultSun() {
     neural: freshNetwork(),
     lastFeatures: null,
     lastActionIndex: 0,
+    rlHidden: null, // حافظه‌ی بلندمدت LSTM (در صورت وجود مدل آموزش‌دیده)؛ بین گام‌ها و بین بارگذاری‌ها حفظ می‌شود
   };
 }
 
@@ -314,6 +363,10 @@ export function sanitizeMemory(raw) {
     b:base.b.map((v,o)=>num(rawNet.layers?.[l]?.b?.[o],0,-8,8)),
   }));
   const neural={layers,w1:layers[0].w,b1:layers[0].b,w2:layers[layers.length-1].w,b2:layers[layers.length-1].b,updates:Math.floor(num(rawNet.updates,0,0,1e9))};
+  const rh=s.rlHidden;
+  const rlHidden=(rh && Array.isArray(rh.h) && Array.isArray(rh.c) && rh.h.length===rh.c.length && rh.h.length>0 && rh.h.length<=256)
+    ? { h: rh.h.map(v=>num(v,0,-20,20)), c: rh.c.map(v=>num(v,0,-20,20)) }
+    : null;
   const st = raw.stats || {};
   return {
     version: MEMORY_VERSION,
@@ -325,6 +378,7 @@ export function sanitizeMemory(raw) {
       wisdomCycles: Math.floor(num(s.wisdomCycles, 0, 0, 1e6)),
       experienceTotal: num(s.experienceTotal, 0, 0, 1e9),
       neural,
+      rlHidden,
       memory: Array.isArray(s.replay ?? s.memory) ? (s.replay ?? s.memory).slice(-256).filter(m => m && Array.isArray(m.features) && m.features.length === NN_INPUTS && Number.isInteger(m.action) && m.action >= 0 && m.action < NN_OUTPUTS).map(m => ({ features: m.features.map(v => num(v, 0, -1, 1)), action: m.action, target: num(m.target, 0, -20, 20), priority:num(m.priority,.1,.01,8) })) : [],
       pillarCharge: {
         mercy: num(pc.mercy, 10, 0, 100),
@@ -361,6 +415,7 @@ function applyMemory(world, mem) {
   sun.experienceTotal = clean.sun.experienceTotal;
   sun.pillarCharge = clean.sun.pillarCharge;
   sun.neural = clean.sun.neural;
+  sun.rlHidden = clean.sun.rlHidden;
   sun.replay = clean.sun.memory;
   for (const key of Object.keys(sun.values)) sun.best[key] = bestPolicy(sun.values[key]);
   world.stats = { ...clean.stats, epochs: clean.stats.epochs + 1 };
@@ -592,7 +647,7 @@ function sunDecidePolicy(world, policyOverride=null, cognitiveAdvice=null) {
   const features=neuralFeatures(world);
   const evaluations=evaluatePolicies(world,features,vals,sun.visits[key]);
   const qValues=evaluations.map(x=>x.decisionScore);
-  const trainedLogits=trainedPolicyLogits(features);
+  const trainedLogits=trainedPolicyLogits(world, features);
   let action=0;
   if(policyOverride && SUN_POLICIES.includes(policyOverride))action=SUN_POLICIES.indexOf(policyOverride);
   else if(world.rng()<eps)action=Math.floor(world.rng()*SUN_POLICIES.length);

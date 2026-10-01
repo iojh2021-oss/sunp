@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   createWorld, step, ZODIAC, SEPHIROT, PATHS_22, getTreeOfLifeState, getCurrentZodiac,
   exportMemory, sanitizeMemory, getLessons, getSunBonus, benchmarkPolicies, benchmarkEcosystem, getSunDecisionReport,
-  SPECIES, CHALLENGES, STATE_FA,
+  SPECIES, CHALLENGES, STATE_FA, SUN_POLICIES, createRng, loadSunRLPolicy,
 } from "../src/simulation.js";
 
 const runN = (w, n) => { for (let i = 0; i < n; i++) step(w); return w; };
@@ -250,4 +250,75 @@ test("گسترش دنیا شکل ورودی شبکه را نمی‌شکند و �
   const report = getSunDecisionReport(w);
   assert.equal(report.policies.length, 4);
   for (const row of report.policies) assert.ok(Number.isFinite(row.score));
+});
+
+// ---------- حافظه‌ی بلندمدت (LSTM) روی سیاست آموزش‌دیده ----------
+function tinyLSTMModel(hiddenSize = 6, seed = 1) {
+  const rng = createRng(seed);
+  const rnd = (n, scale = 0.3) => Array.from({ length: n }, () => (rng() - 0.5) * scale);
+  const mat = (rows, cols, scale) => Array.from({ length: rows }, () => rnd(cols, scale));
+  const bodyOut = 10;
+  return {
+    version: 2, algorithm: "PPO-LSTM", inputSize: 16, actions: 4, actionNames: SUN_POLICIES,
+    body: { weights: mat(bodyOut, 16, 0.3), bias: rnd(bodyOut, 0.1) },
+    lstm: { hiddenSize, Wi: mat(4 * hiddenSize, bodyOut, 0.3), Wh: mat(4 * hiddenSize, hiddenSize, 0.3), bi: rnd(4 * hiddenSize, 0.1), bh: rnd(4 * hiddenSize, 0.1) },
+    actor: { weights: mat(4, hiddenSize, 0.3), bias: rnd(4, 0.1) },
+  };
+}
+
+test("مدل بازگشتی معتبر (LSTM) لود می‌شود؛ مدل‌های بدشکل رد می‌شوند", () => {
+  const good = tinyLSTMModel(6, 11);
+  assert.equal(loadSunRLPolicy(good), true);
+  for (const bad of [
+    { ...good, lstm: { ...good.lstm, hiddenSize: 0 } },
+    { ...good, lstm: { ...good.lstm, Wh: good.lstm.Wh.slice(1) } },
+    { ...good, body: { ...good.body, weights: good.body.weights.map((r) => r.slice(1)) } },
+    { ...good, actor: { ...good.actor, weights: good.actor.weights.slice(0, 3) } },
+    null, {}, { ...good, inputSize: 5 },
+  ]) {
+    assert.equal(loadSunRLPolicy(bad), false, JSON.stringify(bad && Object.keys(bad)));
+  }
+});
+
+test("حافظه‌ی بلندمدت (h,c) با هر گام تغییر می‌کند، محدود می‌ماند و بین گام‌ها حفظ می‌شود", () => {
+  assert.equal(loadSunRLPolicy(tinyLSTMModel(8, 22)), true);
+  const w = createWorld(600);
+  assert.equal(w.sun.rlHidden, null);
+  step(w);
+  assert.ok(w.sun.rlHidden && w.sun.rlHidden.h.length === 8 && w.sun.rlHidden.c.length === 8);
+  const afterOne = w.sun.rlHidden.h.slice();
+  runN(w, 50);
+  assert.ok(w.sun.rlHidden.h.every(Number.isFinite) && w.sun.rlHidden.c.every(Number.isFinite));
+  assert.ok(w.sun.rlHidden.h.some((v, i) => Math.abs(v - afterOne[i]) > 1e-9), "حافظه باید با گذر زمان عوض شود");
+});
+
+test("حافظه‌ی بلندمدت هم مثل بقیه‌ی حافظه ذخیره/بازیابی می‌شود", () => {
+  assert.equal(loadSunRLPolicy(tinyLSTMModel(5, 33)), true);
+  const a = runN(createWorld(701), 40);
+  const mem = JSON.parse(JSON.stringify(exportMemory(a)));
+  assert.ok(mem.sun.rlHidden && mem.sun.rlHidden.h.length === 5);
+  const b = createWorld(702, mem);
+  assert.deepEqual(b.sun.rlHidden, a.sun.rlHidden);
+  step(b);
+  assert.ok(b.sun.rlHidden.h.every(Number.isFinite));
+});
+
+test("اگر اندازه‌ی حافظه با مدل تازه‌بارگذاری‌شده جور نباشد، به‌جای خطا از نو مقداردهی می‌شود", () => {
+  assert.equal(loadSunRLPolicy(tinyLSTMModel(4, 44)), true);
+  const w = runN(createWorld(703), 10);
+  assert.equal(w.sun.rlHidden.h.length, 4);
+  assert.equal(loadSunRLPolicy(tinyLSTMModel(9, 45)), true);
+  step(w);
+  assert.equal(w.sun.rlHidden.h.length, 9);
+  assert.ok(w.sun.rlHidden.h.every(Number.isFinite));
+});
+
+test("حافظه‌ی بلندمدت با سیگنال‌های عامل‌های کمکی (BrainCog/Hyperon) هم بدون خطا کار می‌کند", () => {
+  assert.equal(loadSunRLPolicy(tinyLSTMModel(6, 55)), true);
+  const w = createWorld(900);
+  for (let i = 0; i < 30; i++) {
+    step(w, { cognitiveAdvice: { policyScores: { repair: 0.2, conserve: 0.1, balance: 0.5, diversity: 0.2 } } });
+  }
+  assert.ok(w.sun.rlHidden.h.every(Number.isFinite));
+  assert.ok(Number.isFinite(w.healthIndex));
 });
