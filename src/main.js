@@ -5,7 +5,7 @@ import {
 } from "./simulation.js";
 import { initScene, renderScene, hitTestEntity, speciesLabel } from "./scene.js";
 import { getCognitiveAdvice, COGNITION_MODES, COGNITION_LABELS } from "./cognition.js";
-import { requestCognitiveProposal } from "../cognition/bridge.js";
+import { requestCognitiveProposal, sendCognitiveFeedback } from "../cognition/bridge.js";
 
 const BASE_SEED = 20260101;
 const LOCAL_KEY = "sunp-memory-v1";
